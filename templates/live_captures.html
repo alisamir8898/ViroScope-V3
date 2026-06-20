@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+
+{% block title %}Live Captures - Dynamic Analysis{% endblock %}
+
+{% block extra_head %}
+<style>
+    .live-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+    
+    .session-info {
+        background: linear-gradient(135deg, rgba(0,255,136,0.1) 0%, rgba(100,150,255,0.1) 100%);
+        border: 1px solid rgba(0,255,136,0.2);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+    
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .info-label {
+        font-size: 11px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .info-value {
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .capture-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+    
+    .summary-card {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 6px;
+        padding: 12px;
+        text-align: center;
+    }
+    
+    .summary-count {
+        font-size: 24px;
+        font-weight: 700;
+        color: #00ff88;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .summary-label {
+        font-size: 11px;
+        color: #888;
+        margin-top: 4px;
+        text-transform: uppercase;
+    }
+    
+    .filter-bar {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 24px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    
+    .filter-control {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .filter-label {
+        font-size: 11px;
+        color: #888;
+        text-transform: uppercase;
+    }
+    
+    select {
+        background: rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+    }
+    
+    select:focus {
+        outline: none;
+        border-color: #00ff88;
+        box-shadow: 0 0 8px rgba(0,255,136,0.2);
+    }
+    
+    .btn {
+        padding: 8px 16px;
+        background: rgba(0,255,136,0.1);
+        border: 1px solid #00ff88;
+        color: #00ff88;
+        border-radius: 4px;
+        cursor: pointer;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn:hover {
+        background: rgba(0,255,136,0.2);
+        box-shadow: 0 0 8px rgba(0,255,136,0.3);
+    }
+    
+    .events-timeline {
+        position: relative;
+        padding: 20px 0;
+    }
+    
+    .event-item {
+        background: rgba(255,255,255,0.02);
+        border-left: 3px solid rgba(0,255,136,0.3);
+        border-radius: 4px;
+        padding: 16px;
+        margin-bottom: 12px;
+        transition: all 0.3s ease;
+    }
+    
+    .event-item:hover {
+        background: rgba(255,255,255,0.05);
+        border-left-color: #00ff88;
+        box-shadow: 0 4px 12px rgba(0,255,136,0.1);
+    }
+    
+    .event-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .event-type {
+        font-size: 13px;
+        font-weight: 600;
+        color: #00ff88;
+        font-family: 'JetBrains Mono', monospace;
+        text-transform: uppercase;
+    }
+    
+    .event-category {
+        display: inline-block;
+        padding: 3px 8px;
+        background: rgba(100,150,255,0.2);
+        color: #6496ff;
+        border-radius: 3px;
+        font-size: 10px;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+    
+    .severity-critical {
+        background: rgba(255,51,51,0.2);
+        color: #ff3333;
+        border: 1px solid #ff3333;
+    }
+    
+    .severity-high {
+        background: rgba(255,153,0,0.2);
+        color: #ff9900;
+        border: 1px solid #ff9900;
+    }
+    
+    .severity-medium {
+        background: rgba(255,204,0,0.2);
+        color: #ffcc00;
+        border: 1px solid #ffcc00;
+    }
+    
+    .severity-low {
+        background: rgba(0,255,136,0.2);
+        color: #00ff88;
+        border: 1px solid #00ff88;
+    }
+    
+    .event-severity {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 10px;
+        text-transform: uppercase;
+        font-weight: 600;
+        border: 1px solid;
+    }
+    
+    .event-time {
+        font-size: 11px;
+        color: #888;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .event-details {
+        margin-top: 8px;
+    }
+    
+    .detail-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 6px;
+        font-size: 12px;
+    }
+    
+    .detail-label {
+        color: #888;
+        min-width: 120px;
+        text-transform: uppercase;
+        font-size: 10px;
+    }
+    
+    .detail-value {
+        color: #fff;
+        font-family: 'JetBrains Mono', monospace;
+        word-break: break-all;
+        flex: 1;
+    }
+    
+    .resource-path {
+        background: rgba(0,0,0,0.3);
+        padding: 4px 8px;
+        border-radius: 3px;
+        border-left: 2px solid #00ff88;
+    }
+    
+    .panel {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+    }
+    
+    .panel-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .live-badge {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background: #00ff88;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #00ff88;
+        text-decoration: none;
+        font-size: 13px;
+        margin-bottom: 16px;
+        transition: all 0.2s ease;
+    }
+    
+    .back-link:hover {
+        color: #fff;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #666;
+    }
+    
+    .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.3;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('dynamic_analysis') }}" class="back-link">← Back to Sessions</a>
+
+<div class="panel">
+    <div class="live-header">
+        <div>
+            <h1 style="margin: 0 0 4px 0;">Live Capture Events</h1>
+            <p style="margin: 0; color: #888; font-size: 13px;">Real-time behavioral events from dynamic analysis</p>
+        </div>
+        <div>
+            <button class="btn" onclick="location.reload()">🔄 Refresh</button>
+        </div>
+    </div>
+    
+    <!-- Session Information -->
+    <div class="session-info">
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">File Name</span>
+                <span class="info-value">{{ session.file_name }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">File Hash</span>
+                <span class="info-value">{{ session.file_hash[:16] }}...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Risk Score</span>
+                <span class="info-value" style="color: {% if session.risk_score >= 0.8 %}#ff3333{% elif session.risk_score >= 0.6 %}#ff9900{% elif session.risk_score >= 0.4 %}#ffcc00{% else %}#00ff88{% endif %};">
+                    {{ (session.risk_score * 100)|int }}%
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Malware Type</span>
+                <span class="info-value">{{ session.malware_type }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Execution Time</span>
+                <span class="info-value">{{ "%.2f"|format(session.execution_time) }}s</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Session Created</span>
+                <span class="info-value">{{ session.created_at[:19] }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Capture Summary -->
+    <div class="capture-summary">
+        <div class="summary-card">
+            <div class="summary-count">{{ summary.network.count }}</div>
+            <div class="summary-label">Network Events</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-count">{{ summary.file_system.count }}</div>
+            <div class="summary-label">File System Events</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-count">{{ summary.process.count }}</div>
+            <div class="summary-label">Process Events</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-count">{{ summary.behavior.count }}</div>
+            <div class="summary-label">Behavior Indicators</div>
+        </div>
+    </div>
+    
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <div class="filter-control">
+            <label class="filter-label">Event Type</label>
+            <select id="eventTypeFilter" onchange="applyFilters()">
+                <option value="all">All Events</option>
+                <option value="network_connection">Network Connection</option>
+                <option value="file_created">File Created</option>
+                <option value="file_modified">File Modified</option>
+                <option value="process_created">Process Created</option>
+                <option value="behavioral_indicator">Behavioral Indicator</option>
+            </select>
+        </div>
+        
+        <div class="filter-control">
+            <label class="filter-label">Severity</label>
+            <select id="severityFilter" onchange="applyFilters()">
+                <option value="all">All Severities</option>
+                <option value="critical">🔴 Critical</option>
+                <option value="high">🟠 High</option>
+                <option value="medium">🟡 Medium</option>
+                <option value="low">🟢 Low</option>
+            </select>
+        </div>
+        
+        <div style="margin-top: 24px;">
+            <button class="btn" onclick="resetFilters()">Reset</button>
+        </div>
+    </div>
+    
+    <!-- Events Timeline -->
+    {% if captures %}
+    <div class="events-timeline">
+        <div class="panel-title">
+            <span class="live-badge"></span>
+            Event Stream ({{ captures|length }} events)
+        </div>
+        
+        {% for event in captures %}
+        <div class="event-item">
+            <div class="event-header">
+                <div>
+                    <span class="event-type">{{ event.event_type }}</span>
+                    <span class="event-category">{{ event.event_category }}</span>
+                    <span class="event-severity severity-{{ event.severity }}">{{ event.severity }}</span>
+                </div>
+                <span class="event-time">{{ event.created_at[:19] }}</span>
+            </div>
+            
+            <div class="event-details">
+                {% if event.source_process %}
+                <div class="detail-row">
+                    <span class="detail-label">Process</span>
+                    <span class="detail-value">{{ event.source_process }} (PID: {{ event.source_pid }})</span>
+                </div>
+                {% endif %}
+                
+                {% if event.target_resource %}
+                <div class="detail-row">
+                    <span class="detail-label">Resource</span>
+                    <span class="detail-value resource-path">{{ event.target_resource }}</span>
+                </div>
+                {% endif %}
+                
+                {% if event.event_data %}
+                <div class="detail-row">
+                    <span class="detail-label">Details</span>
+                    <span class="detail-value">
+                        {% set data = event.event_data if event.event_data is string else event.event_data|tojson %}
+                        <code style="background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 3px; display: inline-block; font-size: 11px;">
+                            {{ data[:100] }}{% if data|length > 100 %}...{% endif %}
+                        </code>
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">📭</div>
+        <div>No events captured in this session</div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function applyFilters() {
+    const eventType = document.getElementById('eventTypeFilter').value;
+    const severity = document.getElementById('severityFilter').value;
+    
+    const params = new URLSearchParams();
+    if (eventType !== 'all') params.append('event_type', eventType);
+    if (severity !== 'all') params.append('severity', severity);
+    
+    window.location.href = '/live_captures/{{ session.id }}?' + params.toString();
+}
+
+function resetFilters() {
+    document.getElementById('eventTypeFilter').value = 'all';
+    document.getElementById('severityFilter').value = 'all';
+    window.location.href = '/live_captures/{{ session.id }}';
+}
+</script>
+{% endblock %}

@@ -1,83 +1,105 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}Overview{% endblock %}
 {% block content %}
 <div class="topbar">
     <div>
-        <h1>Dashboard</h1>
-        <div class="subtitle">Overview of all scans run on this machine</div>
+        <h1>Command Center</h1>
+        <div class="subtitle">Global intelligence overview and recent operations</div>
     </div>
-    <a href="{{ url_for('scan') }}" class="btn btn-primary">+ New Scan</a>
+    <a href="{{ url_for('scan') }}" class="btn btn-primary">Deploy New Scan</a>
 </div>
 
 <div class="content">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-            <div class="flash flash-{{ category }}">{{ message }}</div>
-        {% endfor %}
-    {% endwith %}
-
     <div class="grid-stats">
         <div class="stat-card accent-cyan">
-            <div class="stat-value mono">{{ stats.total }}</div>
-            <div class="stat-label">Total Scans</div>
+            <div class="stat-value">{{ stats.total }}</div>
+            <div class="stat-label">Total Intelligence Assets</div>
         </div>
         <div class="stat-card accent-red">
-            <div class="stat-value mono" style="color: var(--signal-red);">{{ stats.malicious }}</div>
-            <div class="stat-label">Malicious</div>
+            <div class="stat-value" style="color: var(--signal-red);">{{ stats.malicious }}</div>
+            <div class="stat-label">Confirmed Threats</div>
         </div>
         <div class="stat-card accent-green">
-            <div class="stat-value mono" style="color: var(--signal-green);">{{ stats.benign }}</div>
-            <div class="stat-label">Benign</div>
+            <div class="stat-value" style="color: var(--signal-green);">{{ stats.benign }}</div>
+            <div class="stat-label">Verified Safe</div>
         </div>
         <div class="stat-card accent-amber">
-            <div class="stat-value mono" style="color: var(--signal-amber);">{{ stats.errors }}</div>
-            <div class="stat-label">Errors</div>
+            <div class="stat-value" style="color: var(--signal-amber);">{{ stats.errors }}</div>
+            <div class="stat-label">Analysis Faults</div>
         </div>
     </div>
 
+    {% if dynamic_stats %}
     <div class="panel">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span class="section-title">Recent Activity</span>
-            <a href="{{ url_for('history') }}" class="text-secondary" style="font-size:13px;">View all →</a>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
+            <span class="section-title">Dynamic Operations Monitor</span>
+            <a href="{{ url_for('dynamic_analysis') }}" class="btn btn-sm btn-secondary">View Ops Log →</a>
+        </div>
+        
+        <div class="grid-stats" style="margin-bottom: 0;">
+            <div class="stat-card" style="--accent: var(--line-bright);">
+                <div class="stat-value">{{ dynamic_stats.total }}</div>
+                <div class="stat-label">Active Sessions</div>
+            </div>
+            <div class="stat-card accent-red">
+                <div class="stat-value">{{ dynamic_stats.critical }}</div>
+                <div class="stat-label">Critical Alerts</div>
+            </div>
+            <div class="stat-card accent-amber">
+                <div class="stat-value">{{ dynamic_stats.high }}</div>
+                <div class="stat-label">High Risk Ops</div>
+            </div>
+            <div class="stat-card accent-green">
+                <div class="stat-value">{{ dynamic_stats.low }}</div>
+                <div class="stat-label">Nominal Status</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+            <span class="section-title">Recent Intelligence Feed</span>
+            <a href="{{ url_for('history') }}" class="btn btn-sm btn-secondary">Full Intelligence Log →</a>
         </div>
 
         {% if recent %}
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>File</th>
+                    <th>Target Asset</th>
                     <th>Verdict</th>
                     <th>Confidence</th>
-                    <th>VirusTotal</th>
-                    <th>Scanned</th>
+                    <th>Cloud Ratio</th>
+                    <th>Timestamp</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in recent %}
                 <tr onclick="window.location='{{ url_for('history_detail', scan_id=r.id) }}'" style="cursor:pointer;">
-                    <td class="fname-cell">{{ r.file_name }}</td>
+                    <td class="fname-cell" style="font-weight: 600; color: #fff;">{{ r.file_name }}</td>
                     <td>
                         {% if r.verdict == 'Malicious' %}
-                            <span class="verdict-badge verdict-malicious">Malicious</span>
+                            <span class="verdict-badge verdict-malicious">Threat Detected</span>
                         {% elif r.verdict == 'Benign' %}
-                            <span class="verdict-badge verdict-benign">Benign</span>
+                            <span class="verdict-badge verdict-benign">Verified Safe</span>
                         {% else %}
-                            <span class="verdict-badge verdict-error">Error</span>
+                            <span class="verdict-badge verdict-error">Analysis Error</span>
                         {% endif %}
                     </td>
                     <td class="mono">{{ '%.1f'|format(r.confidence * 100) + '%' if r.confidence is not none else '—' }}</td>
                     <td class="mono">
                         {% if r.vt_total %}{{ r.vt_malicious }}/{{ r.vt_total }}{% else %}—{% endif %}
                     </td>
-                    <td class="mono text-tertiary">{{ r.created_at[:19].replace('T', ' ') }}</td>
+                    <td class="mono text-tertiary" style="font-size: 12px;">{{ r.created_at[:19].replace('T', ' ') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
         {% else %}
-        <div class="empty-state">
-            <div class="ee-icon">∅</div>
-            <p>لسه مفيش أي فحوصات. <a href="{{ url_for('scan') }}">ابدأ أول فحص</a></p>
+        <div style="text-align: center; padding: 48px 0;">
+            <div style="font-size: 48px; color: var(--line); margin-bottom: 16px;">∅</div>
+            <p class="text-secondary">No intelligence data available. <a href="{{ url_for('scan') }}">Deploy your first scan</a> to begin.</p>
         </div>
         {% endif %}
     </div>

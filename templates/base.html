@@ -1,12 +1,14 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}ViroScope{% endblock %} — ViroScope</title>
+    <title>{% block title %}ViroScope{% endblock %} — CyberSecurity Hub</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     {% block extra_head %}{% endblock %}
 </head>
 <body dir="ltr">
@@ -14,39 +16,69 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-brand">
                 <div class="logo"><span class="dot"></span>VIROSCOPE</div>
-                <div class="tagline">Malware Triage Console</div>
+                <div class="tagline">Advanced Malware Research</div>
             </div>
             <nav class="sidebar-nav">
                 <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">
-                    <span class="icon">▣</span> Dashboard
+                    <span class="icon">▣</span> Overview
                 </a>
                 <a href="{{ url_for('scan') }}" class="{{ 'active' if request.endpoint == 'scan' }}">
                     <span class="icon">▶</span> Single Scan
                 </a>
                 <a href="{{ url_for('batch') }}" class="{{ 'active' if request.endpoint == 'batch' }}">
-                    <span class="icon">▤</span> Batch Scan
+                    <span class="icon">▤</span> Batch Analysis
                 </a>
                 <a href="{{ url_for('history') }}" class="{{ 'active' if request.endpoint in ['history', 'history_detail'] }}">
                     <span class="icon">▥</span> History
+                </a>
+                <a href="{{ url_for('dynamic_analysis') }}" class="{{ 'active' if request.endpoint in ['dynamic_analysis', 'dynamic_detail', 'live_captures'] }}">
+                    <span class="icon">▤
+</span> Dynamic Scanner
                 </a>
             </nav>
             <div class="sidebar-status">
                 <div class="status-pill">
                     <span class="led {{ 'led-on' if model_ready else 'led-off' }}"></span>
-                    ML Model: {{ 'Ready' if model_ready else 'Offline' }}
+                    Core Engine: {{ 'Active' if model_ready else 'Standby' }}
                 </div>
-                <div class="status-pill" style="margin-top: 8px;">
+                <div class="status-pill">
                     <span class="led {{ 'led-on' if vt_enabled else 'led-warn' }}"></span>
-                    VirusTotal: {{ 'Connected' if vt_enabled else 'Not Configured' }}
+                    Cloud Link: {{ 'Secure' if vt_enabled else 'Offline' }}
                 </div>
             </div>
         </aside>
 
         <div class="main">
             {% block content %}{% endblock %}
-            <footer class="app-footer">ViroScope · running locally on 127.0.0.1:5000 · RandomForest PE classifier + VirusTotal v3</footer>
+            <footer style="padding: 20px 48px; font-size: 11px; color: var(--text-tertiary); border-top: 1px solid var(--line); font-family: var(--font-mono);">
+                ViroScope Framework v3.0.4 · Production Environment · 127.0.0.1:5000
+            </footer>
         </div>
     </div>
+
+    <script>
+        // SweetAlert helper for Flask Flash Messages
+        document.addEventListener('DOMContentLoaded', () => {
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        Swal.fire({
+                            title: '{{ category|capitalize }}',
+                            text: '{{ message }}',
+                            icon: '{{ "success" if category == "success" else "error" if category == "error" else "info" }}',
+                            toast: true,
+                            position: 'top-end',
+                            showConfirmButton: false,
+                            timer: 3000,
+                            timerProgressBar: true,
+                            background: '#0d1117',
+                            color: '#f0f6fc'
+                        });
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        });
+    </script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

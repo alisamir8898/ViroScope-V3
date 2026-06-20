@@ -7,3 +7,6 @@ pandas==2.2.2
 numpy==1.26.4
 pefile==2023.2.7
 requests==2.32.3
+python-magic==0.4.27
+psutil==5.9.8
+watchdog==6.0.0

@@ -1,68 +1,69 @@
 {% extends "base.html" %}
-{% block title %}History{% endblock %}
+{% block title %}Intelligence Log{% endblock %}
 {% block content %}
 <div class="topbar">
     <div>
-        <h1>Scan History</h1>
-        <div class="subtitle">{{ stats.total }} scans recorded locally</div>
+        <h1>Intelligence Log</h1>
+        <div class="subtitle">Comprehensive database of all analyzed target assets</div>
     </div>
-    {% if records %}
-    <form method="POST" action="{{ url_for('api_clear_history') }}" onsubmit="return confirm('متأكد عايز تمسح كل السجل التاريخي؟');">
-        <button type="submit" class="btn btn-danger btn-sm">Clear History</button>
-    </form>
-    {% endif %}
+    <div style="display: flex; gap: 12px;">
+        <button onclick="purgeHistory()" class="btn btn-sm btn-danger">Purge Intelligence</button>
+    </div>
 </div>
 
 <div class="content">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-            <div class="flash flash-{{ category }}">{{ message }}</div>
-        {% endfor %}
-    {% endwith %}
-
-    <form method="GET" class="filter-bar">
-        <input type="text" name="q" placeholder="Search file name or hash…" value="{{ search }}">
-        <select name="verdict" onchange="this.form.submit()">
-            <option value="all" {{ 'selected' if verdict_filter == 'all' }}>All verdicts</option>
-            <option value="Malicious" {{ 'selected' if verdict_filter == 'Malicious' }}>Malicious only</option>
-            <option value="Benign" {{ 'selected' if verdict_filter == 'Benign' }}>Benign only</option>
-            <option value="Error" {{ 'selected' if verdict_filter == 'Error' }}>Errors only</option>
-        </select>
-        <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
-    </form>
-
     <div class="panel">
+        <form method="GET" style="display: flex; gap: 16px; align-items: flex-end; margin-bottom: 24px;">
+            <div style="flex: 1;">
+                <label class="eyebrow">Verdict Filter</label>
+                <select name="verdict" class="btn btn-secondary btn-sm" style="width: 100%; text-align: left; background: var(--bg-panel-2); color: #fff;">
+                    <option value="all">All Verdicts</option>
+                    <option value="Malicious" {{ 'selected' if verdict_filter == 'Malicious' }}>Threats Only</option>
+                    <option value="Benign" {{ 'selected' if verdict_filter == 'Benign' }}>Verified Safe</option>
+                </select>
+            </div>
+            <div style="flex: 1;">
+                <label class="eyebrow">Search Intelligence</label>
+                <input type="text" name="q" placeholder="Asset name or hash..." value="{{ search }}" 
+                       style="width: 100%; background: var(--bg-panel-2); border: 1px solid var(--line); color: #fff; padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 13px;">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Query Database</button>
+            <a href="{{ url_for('history') }}" class="btn btn-secondary btn-sm">Reset</a>
+        </form>
+
         {% if records %}
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>File</th>
+                    <th>Target Asset</th>
                     <th>Verdict</th>
                     <th>Confidence</th>
-                    <th>VirusTotal</th>
-                    <th>Scanned</th>
-                    <th></th>
+                    <th>Cloud Ratio</th>
+                    <th>Timestamp</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in records %}
-                <tr>
-                    <td class="fname-cell" style="cursor:pointer;" onclick="window.location='{{ url_for('history_detail', scan_id=r.id) }}'">{{ r.file_name }}</td>
+                <tr onclick="window.location='{{ url_for('history_detail', scan_id=r.id) }}'" style="cursor:pointer;">
+                    <td style="font-weight: 600; color: #fff;">{{ r.file_name }}</td>
                     <td>
                         {% if r.verdict == 'Malicious' %}
-                            <span class="verdict-badge verdict-malicious">Malicious</span>
+                            <span class="verdict-badge verdict-malicious">Threat</span>
                         {% elif r.verdict == 'Benign' %}
-                            <span class="verdict-badge verdict-benign">Benign</span>
+                            <span class="verdict-badge verdict-benign">Safe</span>
                         {% else %}
                             <span class="verdict-badge verdict-error">Error</span>
                         {% endif %}
                     </td>
                     <td class="mono">{{ '%.1f'|format(r.confidence * 100) + '%' if r.confidence is not none else '—' }}</td>
-                    <td class="mono">{% if r.vt_total %}{{ r.vt_malicious }}/{{ r.vt_total }}{% else %}—{% endif %}</td>
-                    <td class="mono text-tertiary">{{ r.created_at[:19].replace('T', ' ') }}</td>
+                    <td class="mono">
+                        {% if r.vt_total %}{{ r.vt_malicious }}/{{ r.vt_total }}{% else %}—{% endif %}
+                    </td>
+                    <td class="mono text-tertiary" style="font-size: 11px;">{{ r.created_at[:19].replace('T', ' ') }}</td>
                     <td>
-                        <form method="POST" action="{{ url_for('api_delete_scan', scan_id=r.id) }}" onsubmit="return confirm('Delete this record?');">
-                            <button type="submit" class="btn btn-secondary btn-sm" style="padding:4px 10px;">✕</button>
+                        <form action="{{ url_for('api_delete_scan', scan_id=r.id) }}" method="POST" style="display:inline;" onclick="event.stopPropagation();">
+                            <button type="button" onclick="confirmDelete(this.form)" class="btn btn-sm btn-danger" style="padding: 4px 8px; font-size: 10px;">Delete</button>
                         </form>
                     </td>
                 </tr>
@@ -70,11 +71,49 @@
             </tbody>
         </table>
         {% else %}
-        <div class="empty-state">
-            <div class="ee-icon">∅</div>
-            <p>مفيش نتائج تطابق الفلتر ده.</p>
+        <div style="text-align: center; padding: 64px 0;">
+            <div style="font-size: 48px; color: var(--line); margin-bottom: 16px;">📂</div>
+            <p class="text-secondary">No records found in the intelligence database.</p>
         </div>
         {% endif %}
     </div>
 </div>
+
+<script>
+function confirmDelete(form) {
+    Swal.fire({
+        title: 'Delete Asset?',
+        text: "This record will be permanently removed from the intelligence log.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Delete',
+        background: '#0d1117',
+        color: '#f0f6fc',
+        confirmButtonColor: '#ff4444'
+    }).then((result) => {
+        if (result.isConfirmed) form.submit();
+    });
+}
+
+function purgeHistory() {
+    Swal.fire({
+        title: 'Purge Intelligence Log?',
+        text: "This will permanently delete all scan records and analysis history.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Purge All',
+        background: '#0d1117',
+        color: '#f0f6fc',
+        confirmButtonColor: '#ff4444'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = "{{ url_for('api_clear_history') }}";
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+</script>
 {% endblock %}

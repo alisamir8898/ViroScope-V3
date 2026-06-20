@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}Session Details - Dynamic Analysis{% endblock %}
+
+{% block extra_head %}
+<style>
+    .detail-container {
+        max-width: 1200px;
+    }
+    
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #00ff88;
+        text-decoration: none;
+        font-size: 13px;
+        margin-bottom: 16px;
+        transition: all 0.2s ease;
+    }
+    
+    .back-link:hover {
+        color: #fff;
+    }
+    
+    .hero-section {
+        background: linear-gradient(135deg, rgba(0,255,136,0.1) 0%, rgba(100,150,255,0.1) 100%);
+        border: 1px solid rgba(0,255,136,0.2);
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+    
+    .hero-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 24px;
+    }
+    
+    .hero-item {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .hero-label {
+        font-size: 11px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .hero-value {
+        font-size: 18px;
+        font-weight: 700;
+        color: #fff;
+        font-family: 'JetBrains Mono', monospace;
+        word-break: break-all;
+    }
+    
+    .risk-score-display {
+        font-size: 32px;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .risk-critical { color: #ff3333; }
+    .risk-high { color: #ff9900; }
+    .risk-medium { color: #ffcc00; }
+    .risk-low { color: #00ff88; }
+    
+    .panel {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+    }
+    
+    .panel-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        padding-bottom: 12px;
+    }
+    
+    .section-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+    }
+    
+    .info-box {
+        background: rgba(0,0,0,0.2);
+        border: 1px solid rgba(255,255,255,0.05);
+        border-radius: 6px;
+        padding: 12px;
+    }
+    
+    .info-label {
+        font-size: 11px;
+        color: #888;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+    
+    .info-value {
+        font-size: 13px;
+        color: #fff;
+        font-family: 'JetBrains Mono', monospace;
+        word-break: break-all;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .badge-type {
+        background: rgba(100,150,255,0.2);
+        color: #6496ff;
+        border: 1px solid #6496ff;
+    }
+    
+    .list-container {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .list-item {
+        background: rgba(0,0,0,0.2);
+        border-left: 2px solid rgba(0,255,136,0.3);
+        padding: 12px;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-family: 'JetBrains Mono', monospace;
+        word-break: break-all;
+    }
+    
+    .list-item:hover {
+        background: rgba(0,0,0,0.3);
+        border-left-color: #00ff88;
+    }
+    
+    .empty-list {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+        font-size: 13px;
+    }
+    
+    .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .tab {
+        padding: 12px 16px;
+        background: transparent;
+        border: none;
+        color: #888;
+        cursor: pointer;
+        font-size: 13px;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s ease;
+    }
+    
+    .tab.active {
+        color: #00ff88;
+        border-bottom-color: #00ff88;
+    }
+    
+    .tab:hover {
+        color: #fff;
+    }
+    
+    .tab-content {
+        display: none;
+    }
+    
+    .tab-content.active {
+        display: block;
+    }
+    
+    .btn {
+        padding: 8px 16px;
+        background: rgba(0,255,136,0.1);
+        border: 1px solid #00ff88;
+        color: #00ff88;
+        border-radius: 4px;
+        cursor: pointer;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn:hover {
+        background: rgba(0,255,136,0.2);
+        box-shadow: 0 0 8px rgba(0,255,136,0.3);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('dynamic_analysis') }}" class="back-link">← Back to Sessions</a>
+
+<div class="detail-container">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="hero-grid">
+            <div class="hero-item">
+                <span class="hero-label">File Name</span>
+                <span class="hero-value">{{ session.file_name }}</span>
+            </div>
+            <div class="hero-item">
+                <span class="hero-label">File Hash (SHA-256)</span>
+                <span class="hero-value" style="font-size: 14px;">{{ session.file_hash }}</span>
+            </div>
+            <div class="hero-item">
+                <span class="hero-label">Risk Score</span>
+                <span class="hero-value risk-score-display {% if session.risk_score >= 0.8 %}risk-critical{% elif session.risk_score >= 0.6 %}risk-high{% elif session.risk_score >= 0.4 %}risk-medium{% else %}risk-low{% endif %}">
+                    {{ (session.risk_score * 100)|int }}%
+                </span>
+            </div>
+            <div class="hero-item">
+                <span class="hero-label">Malware Type</span>
+                <span class="badge badge-type">{{ session.malware_type }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Execution Information -->
+    <div class="panel">
+        <div class="panel-title">🔧 Execution Information</div>
+        <div class="section-grid">
+            <div class="info-box">
+                <div class="info-label">Execution Time</div>
+                <div class="info-value">{{ "%.2f"|format(session.execution_time) }} seconds</div>
+            </div>
+            <div class="info-box">
+                <div class="info-label">Exit Code</div>
+                <div class="info-value">{{ session.exit_code if session.exit_code is not none else 'N/A' }}</div>
+            </div>
+            <div class="info-box">
+                <div class="info-label">File Size</div>
+                <div class="info-value">{{ "%.2f"|format(session.file_size / 1024) }} KB</div>
+            </div>
+            <div class="info-box">
+                <div class="info-label">Session Created</div>
+                <div class="info-value">{{ session.created_at[:19] }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Behavioral Indicators -->
+    <div class="panel">
+        <div class="panel-title">⚠️ Behavioral Indicators</div>
+        {% set indicators = session.behavioral_indicators if session.behavioral_indicators is iterable else [] %}
+        {% if indicators %}
+        <div class="list-container">
+            {% for indicator in indicators %}
+            <div class="list-item">{{ indicator }}</div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-list">No behavioral indicators detected</div>
+        {% endif %}
+    </div>
+    
+    <!-- Network Activity -->
+    <div class="panel">
+        <div class="panel-title">🌐 Network Activity</div>
+        {% set network = session.network_activity if session.network_activity is iterable else [] %}
+        {% if network %}
+        <div class="list-container">
+            {% for conn in network %}
+            <div class="list-item">
+                <strong>{{ conn.get('remote_address', 'Unknown') }}</strong>
+                {% if conn.get('status') %} - {{ conn.get('status') }}{% endif %}
+                {% if conn.get('pid') %} (PID: {{ conn.get('pid') }}){% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-list">No network activity detected</div>
+        {% endif %}
+    </div>
+    
+    <!-- File Changes -->
+    <div class="panel">
+        <div class="panel-title">📁 File System Changes</div>
+        {% set files = session.file_changes if session.file_changes is mapping else {} %}
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab(event, 'created')">Created ({{ files.get('created', [])|length }})</button>
+            <button class="tab" onclick="switchTab(event, 'modified')">Modified ({{ files.get('modified', [])|length }})</button>
+            <button class="tab" onclick="switchTab(event, 'deleted')">Deleted ({{ files.get('deleted', [])|length }})</button>
+        </div>
+        
+        <div id="created" class="tab-content active">
+            {% if files.get('created', []) %}
+            <div class="list-container">
+                {% for file in files.get('created', []) %}
+                <div class="list-item">{{ file }}</div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-list">No files created</div>
+            {% endif %}
+        </div>
+        
+        <div id="modified" class="tab-content">
+            {% if files.get('modified', []) %}
+            <div class="list-container">
+                {% for file in files.get('modified', []) %}
+                <div class="list-item">{{ file }}</div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-list">No files modified</div>
+            {% endif %}
+        </div>
+        
+        <div id="deleted" class="tab-content">
+            {% if files.get('deleted', []) %}
+            <div class="list-container">
+                {% for file in files.get('deleted', []) %}
+                <div class="list-item">{{ file }}</div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-list">No files deleted</div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Process Information -->
+    <div class="panel">
+        <div class="panel-title">⚙️ Process Information</div>
+        {% set processes = session.process_info if session.process_info is iterable else [] %}
+        {% if processes %}
+        <div class="list-container">
+            {% for proc in processes %}
+            <div class="list-item">
+                <strong>{{ proc.get('name', 'Unknown') }}</strong> (PID: {{ proc.get('pid', 'N/A') }})
+                {% if proc.get('exe') %}<br/>{{ proc.get('exe') }}{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-list">No process information available</div>
+        {% endif %}
+    </div>
+    
+    <!-- Evasion Techniques -->
+    <div class="panel">
+        <div class="panel-title">🛡️ Evasion Techniques Detected</div>
+        {% set evasion = session.evasion_techniques if session.evasion_techniques is mapping else {} %}
+        
+        <div class="section-grid">
+            {% for technique, details in evasion.items() %}
+            <div class="info-box">
+                <div class="info-label">{{ technique|replace('_', ' ')|title }}</div>
+                {% if details %}
+                <div class="info-value">
+                    {% if details is iterable and details is not string %}
+                        {{ details|length }} detected
+                    {% else %}
+                        Detected
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="info-value" style="color: #888;">Not detected</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Actions -->
+    <div class="panel" style="text-align: center;">
+        <a href="{{ url_for('live_captures', session_id=session.id) }}" class="btn">📡 View Live Events</a>
+        <a href="{{ url_for('dynamic_analysis') }}" class="btn">← Back to Sessions</a>
+    </div>
+</div>
+
+<script>
+function switchTab(event, tabName) {
+    // Hide all tab contents
+    const contents = document.querySelectorAll('.tab-content');
+    contents.forEach(content => content.classList.remove('active'));
+    
+    // Remove active class from all tabs
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => tab.classList.remove('active'));
+    
+    // Show selected tab content and mark tab as active
+    document.getElementById(tabName).classList.add('active');
+    event.target.classList.add('active');
+}
+</script>
+{% endblock %}

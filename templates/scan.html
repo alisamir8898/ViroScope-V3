@@ -1,52 +1,68 @@
 {% extends "base.html" %}
-{% block title %}Single Scan{% endblock %}
+{% block title %}Engine Scan{% endblock %}
 {% block content %}
 <div class="topbar">
     <div>
-        <h1>Single File Scan</h1>
-        <div class="subtitle">Upload one executable for ML classification + VirusTotal lookup</div>
+        <h1>Engine Analysis</h1>
+        <div class="subtitle">Deploy static and dynamic research modules on a target file</div>
     </div>
 </div>
 
 <div class="content">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-            <div class="flash flash-{{ category }}">{{ message }}</div>
-        {% endfor %}
-    {% endwith %}
-
     <form method="POST" enctype="multipart/form-data" id="scan-form">
         <div class="panel">
-            <span class="eyebrow">Step 01</span>
-            <span class="section-title">Select a file</span>
+            <span class="eyebrow">Source Selection</span>
+            <span class="section-title">Upload Target Executable</span>
 
-            <label class="dropzone" id="dropzone">
-                <div class="dz-icon">⌖</div>
-                <div class="dz-text">Drop a file here or click to browse</div>
-                <div class="dz-hint">.exe · .dll · .sys · .scr · .ocx — max 64MB</div>
-                <input type="file" name="file" id="file-input" required>
-            </label>
-            <div class="file-chip-list" id="file-chip-list"></div>
+            <div class="dropzone" id="dropzone">
+                <div id="dz-initial">
+                    <div class="dz-icon">⌖</div>
+                    <div class="dz-text">Drag target here or click to select</div>
+                    <div class="dz-hint">Supported: .exe, .dll, .sys, .scr, .ocx (Max 64MB)</div>
+                </div>
+                
+                <div id="dz-selected" style="display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center;">
+                    <div class="dz-icon" style="color: var(--signal-cyan);">✓</div>
+                    <div id="selected-filename" style="font-weight: 700; color: #fff; font-size: 18px; margin-bottom: 8px; font-family: var(--font-mono);"></div>
+                    <div id="selected-filesize" style="color: var(--text-tertiary); font-size: 14px; margin-bottom: 20px;"></div>
+                    <button type="button" id="change-file-btn" class="btn btn-sm btn-secondary" style="border-radius: 20px; padding: 6px 20px;">
+                        ↺ Change File
+                    </button>
+                </div>
+                
+                <input type="file" name="file" id="file-input" required style="position: absolute; inset: 0; opacity: 0; cursor: pointer;">
+            </div>
         </div>
 
         <div class="panel">
-            <span class="eyebrow">Step 02</span>
-            <span class="section-title">Options</span>
+            <span class="eyebrow">Analysis Parameters</span>
+            <span class="section-title">Research Modules</span>
 
-            <div class="field-row">
+            <div class="field-row" style="border-top: none;">
                 <div>
-                    <div>Check against VirusTotal</div>
-                    <div class="text-tertiary" style="font-size:12px;">Looks up the file's hash on VirusTotal (no upload unless unknown)</div>
+                    <div style="font-weight: 600;">Cloud Intelligence (VirusTotal)</div>
+                    <div class="text-tertiary" style="font-size:12px;">Query global reputation database for known signatures</div>
                 </div>
                 <label class="toggle">
-                    <input type="checkbox" name="check_vt" value="1" {{ 'checked' if vt_enabled else 'disabled' }} {{ 'checked' if vt_enabled }}>
+                    <input type="checkbox" name="check_vt" value="1" {{ 'checked' if vt_enabled else 'disabled' }}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="field-row" style="margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px;">
+                <div>
+                    <div style="color: var(--signal-cyan); font-weight: 600;">Dynamic Behavioral Sandbox</div>
+                    <div class="text-tertiary" style="font-size:12px;">Monitor real-time execution, network hooks, and process spawning</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" name="run_dynamic" value="1" checked>
                     <span class="slider"></span>
                 </label>
             </div>
         </div>
 
         <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
-            <span class="mono">▶</span> Run Analysis
+            Deploy Analysis Engine
         </button>
     </form>
 </div>
@@ -54,7 +70,11 @@
 <script>
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('file-input');
-const chipList = document.getElementById('file-chip-list');
+const dzInitial = document.getElementById('dz-initial');
+const dzSelected = document.getElementById('dz-selected');
+const selectedFilename = document.getElementById('selected-filename');
+const selectedFilesize = document.getElementById('selected-filesize');
+const changeFileBtn = document.getElementById('change-file-btn');
 const form = document.getElementById('scan-form');
 const submitBtn = document.getElementById('submit-btn');
 
@@ -64,15 +84,30 @@ function formatSize(bytes) {
     return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
 }
 
-function renderChip() {
-    chipList.innerHTML = '';
+function updateUI() {
     if (fileInput.files.length > 0) {
         const f = fileInput.files[0];
-        chipList.innerHTML = `<div class="file-chip"><span class="fname mono">${f.name}</span><span class="fsize mono">${formatSize(f.size)}</span></div>`;
+        selectedFilename.textContent = f.name;
+        selectedFilesize.textContent = formatSize(f.size);
+        
+        dzInitial.style.display = 'none';
+        dzSelected.style.display = 'flex';
+        fileInput.style.pointerEvents = 'none'; // Disable input while file is selected to allow clicking the button
+    } else {
+        dzInitial.style.display = 'block';
+        dzSelected.style.display = 'none';
+        fileInput.style.pointerEvents = 'auto';
     }
 }
 
-fileInput.addEventListener('change', renderChip);
+fileInput.addEventListener('change', updateUI);
+
+changeFileBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileInput.value = ''; // Clear selection
+    updateUI();
+    fileInput.click(); // Open browser again
+});
 
 ['dragover', 'dragenter'].forEach(evt =>
     dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('dragover'); })
@@ -83,13 +118,33 @@ fileInput.addEventListener('change', renderChip);
 dropzone.addEventListener('drop', e => {
     if (e.dataTransfer.files.length) {
         fileInput.files = e.dataTransfer.files;
-        renderChip();
+        updateUI();
     }
 });
 
-form.addEventListener('submit', () => {
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="mono">◌</span> Analyzing…';
+form.addEventListener('submit', (e) => {
+    if (fileInput.files.length === 0) {
+        e.preventDefault();
+        Swal.fire({
+            title: 'No File Selected',
+            text: 'Please select a target executable first.',
+            icon: 'error',
+            background: '#0d1117',
+            color: '#f0f6fc'
+        });
+        return;
+    }
+    
+    Swal.fire({
+        title: 'Initializing Analysis',
+        html: 'Deploying research modules and monitoring hooks...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        },
+        background: '#0d1117',
+        color: '#f0f6fc'
+    });
 });
 </script>
 {% endblock %}

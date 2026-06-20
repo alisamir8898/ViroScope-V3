@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Dynamic Operations{% endblock %}
+{% block content %}
+<div class="topbar">
+    <div>
+        <h1>Dynamic Operations</h1>
+        <div class="subtitle">Real-time behavioral research and live event capture logs</div>
+    </div>
+    <div style="display: flex; gap: 12px;">
+        <button onclick="location.reload()" class="btn btn-sm btn-secondary">Refresh Feed</button>
+        <button onclick="clearDynamicHistory()" class="btn btn-sm btn-danger">Purge Ops Data</button>
+    </div>
+</div>
+
+<div class="content">
+    <div class="grid-stats">
+        <div class="stat-card accent-cyan">
+            <div class="stat-value">{{ stats.total }}</div>
+            <div class="stat-label">Total Sessions</div>
+        </div>
+        <div class="stat-card accent-red">
+            <div class="stat-value">{{ stats.critical }}</div>
+            <div class="stat-label">Critical Risks</div>
+        </div>
+        <div class="stat-card accent-amber">
+            <div class="stat-value">{{ stats.high }}</div>
+            <div class="stat-label">High Priority</div>
+        </div>
+        <div class="stat-card accent-green">
+            <div class="stat-value">{{ stats.low }}</div>
+            <div class="stat-label">Low Priority</div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <form method="GET" style="display: flex; gap: 16px; align-items: flex-end; margin-bottom: 24px;">
+            <div style="flex: 1;">
+                <label class="eyebrow">Risk Classification</label>
+                <select name="risk" class="btn btn-secondary btn-sm" style="width: 100%; text-align: left; background: var(--bg-panel-2); color: #fff;">
+                    <option value="all">All Risk Levels</option>
+                    <option value="critical" {{ 'selected' if request.args.get('risk') == 'critical' }}>Critical</option>
+                    <option value="high" {{ 'selected' if request.args.get('risk') == 'high' }}>High</option>
+                    <option value="medium" {{ 'selected' if request.args.get('risk') == 'medium' }}>Medium</option>
+                    <option value="low" {{ 'selected' if request.args.get('risk') == 'low' }}>Low</option>
+                </select>
+            </div>
+            <div style="flex: 1;">
+                <label class="eyebrow">Target Search</label>
+                <input type="text" name="search" placeholder="Target name or hash..." value="{{ request.args.get('search', '') }}" 
+                       style="width: 100%; background: var(--bg-panel-2); border: 1px solid var(--line); color: #fff; padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 13px;">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Filter Ops</button>
+            <a href="{{ url_for('dynamic_analysis') }}" class="btn btn-secondary btn-sm">Reset</a>
+        </form>
+
+        {% if sessions %}
+        <div style="width: 100%;">
+            <table class="data-table" style="table-layout: fixed;">
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Target Asset</th>
+                        <th style="width: 20%;">Risk Profile</th>
+                        <th style="width: 15%;">Type</th>
+                        <th style="width: 10%;">Runtime</th>
+                        <th style="width: 10%;">Events</th>
+                        <th style="width: 15%;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sessions %}
+                    <tr>
+                        <td style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <div style="font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis;">{{ s.file_name }}</div>
+                            <div class="mono text-tertiary" style="font-size: 10px;">{{ s.file_hash[:16] }}...</div>
+                        </td>
+                        <td>
+                            {% set risk = s.risk_score * 100 %}
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="flex: 1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden;">
+                                    <div style="width: {{ risk }}%; height: 100%; background: {% if risk >= 80 %}var(--signal-red){% elif risk >= 50 %}var(--signal-amber){% else %}var(--signal-cyan){% endif %};"></div>
+                                </div>
+                                <span class="mono" style="font-size: 11px;">{{ risk|int }}%</span>
+                            </div>
+                        </td>
+                        <td><span class="verdict-badge" style="background: rgba(255,255,255,0.05); color: var(--text-secondary); border: 1px solid var(--line); font-size: 10px; padding: 2px 6px;">{{ s.malware_type }}</span></td>
+                        <td class="mono text-tertiary" style="font-size: 12px;">{{ "%.2f"|format(s.execution_time) }}s</td>
+                        <td>
+                            <div style="display: flex; gap: 6px;">
+                                <span title="Network" style="color: var(--signal-cyan); font-size: 11px;">🌐{{ s.network_activity_count }}</span>
+                                <span title="Files" style="color: var(--signal-amber); font-size: 11px;">📁{{ s.file_changes_count }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 4px;">
+                                <a href="{{ url_for('dynamic_detail', session_id=s.id) }}" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 11px;">Report</a>
+                                <a href="{{ url_for('live_captures', session_id=s.id) }}" class="btn btn-sm btn-primary" style="padding: 4px 8px; font-size: 11px;">Live</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 64px 0;">
+            <div style="font-size: 48px; color: var(--line); margin-bottom: 16px;">📂</div>
+            <p class="text-secondary">No dynamic operations recorded. <a href="{{ url_for('scan') }}">Initialize research</a> to capture behavior.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function clearDynamicHistory() {
+    Swal.fire({
+        title: 'Purge Operation Data?',
+        text: "This will permanently delete all behavioral logs and session intelligence.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Purge Data',
+        cancelButtonText: 'Abort',
+        background: '#0d1117',
+        color: '#f0f6fc',
+        confirmButtonColor: '#ff4444',
+        cancelButtonColor: '#30363d'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch("{{ url_for('api_clear_dynamic') }}", { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    Swal.fire({
+                        title: 'Purged',
+                        text: 'Intelligence database cleared.',
+                        icon: 'success',
+                        background: '#0d1117',
+                        color: '#f0f6fc'
+                    }).then(() => location.reload());
+                }
+            });
+        }
+    });
+}
+</script>
+{% endblock %}

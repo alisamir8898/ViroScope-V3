@@ -29,6 +29,7 @@ from dotenv import load_dotenv
 import database
 from predictor import predict_file, model_is_ready, load_model
 from vt_scanner import VirusTotalScanner
+from dynamic_analysis_manager import get_manager as get_analysis_manager
 
 load_dotenv()
 
@@ -69,8 +70,8 @@ def save_upload(file_storage):
     return saved_path, original_name
 
 
-def run_full_analysis(saved_path, original_name, check_vt=True):
-    """ML prediction + optional VirusTotal lookup + history persistence."""
+def run_full_analysis(saved_path, original_name, check_vt=True, run_dynamic=False):
+    """ML prediction + optional VirusTotal lookup + history persistence + optional dynamic analysis."""
     ml_result = predict_file(saved_path)
 
     file_size = os.path.getsize(saved_path) if os.path.exists(saved_path) else None
@@ -80,7 +81,7 @@ def run_full_analysis(saved_path, original_name, check_vt=True):
     if check_vt and vt_scanner.enabled and sha256:
         vt_result = vt_scanner.lookup_hash(sha256)
 
-    database.save_scan(
+    scan_id = database.save_scan(
         file_name=original_name,
         sha256=sha256,
         file_size=file_size,
@@ -88,12 +89,23 @@ def run_full_analysis(saved_path, original_name, check_vt=True):
         vt_result=vt_result,
     )
 
+    dynamic_result = None
+    if run_dynamic:
+        try:
+            manager = get_analysis_manager()
+            dynamic_result = manager.run_analysis(saved_path, scan_id=scan_id, original_name=original_name)
+        except Exception as e:
+            logger.error(f"Error running dynamic analysis: {e}")
+            dynamic_result = {"error": str(e)}
+
     return {
+        "id": scan_id,
         "file_name": original_name,
         "sha256": sha256,
         "file_size": file_size,
         "ml": ml_result,
         "vt": vt_result,
+        "dynamic": dynamic_result,
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -110,7 +122,15 @@ def inject_globals():
 def dashboard():
     stats = database.get_stats()
     recent = database.get_history(limit=8)
-    return render_template("dashboard.html", stats=stats, recent=recent)
+    
+    # Get dynamic analysis stats
+    try:
+        manager = get_analysis_manager()
+        dynamic_stats = manager.get_statistics()
+    except:
+        dynamic_stats = None
+    
+    return render_template("dashboard.html", stats=stats, recent=recent, dynamic_stats=dynamic_stats)
 
 
 @app.route("/scan", methods=["GET", "POST"])
@@ -129,9 +149,10 @@ def scan():
 
     saved_path, original_name = save_upload(file)
     check_vt = request.form.get("check_vt", "1") == "1"
+    run_dynamic = request.form.get("run_dynamic", "0") == "1"
 
     try:
-        result = run_full_analysis(saved_path, original_name, check_vt=check_vt)
+        result = run_full_analysis(saved_path, original_name, check_vt=check_vt, run_dynamic=run_dynamic)
     finally:
         if os.path.exists(saved_path):
             os.remove(saved_path)
@@ -255,6 +276,80 @@ def api_delete_scan(scan_id):
 @app.route("/api/vt-status")
 def api_vt_status():
     return jsonify(vt_scanner.get_status())
+
+
+@app.route("/dynamic_analysis")
+def dynamic_analysis():
+    """Dynamic analysis sessions page"""
+    risk_filter = request.args.get("risk", "all")
+    malware_type_filter = request.args.get("type", "all")
+    search = request.args.get("search", "").strip() or None
+    
+    manager = get_analysis_manager()
+    sessions = manager.get_sessions_list(risk_filter=risk_filter, malware_type_filter=malware_type_filter)
+    
+    # Filter by search if provided
+    if search:
+        sessions = [s for s in sessions if search.lower() in s.get('file_name', '').lower() or 
+                   search.lower() in s.get('file_hash', '').lower()]
+    
+    stats = manager.get_statistics()
+    return render_template("dynamic_analysis.html", sessions=sessions, stats=stats)
+
+
+@app.route("/dynamic_analysis/<int:session_id>")
+def dynamic_detail(session_id):
+    """Dynamic analysis session details"""
+    manager = get_analysis_manager()
+    details = manager.get_session_details(session_id)
+    
+    if not details:
+        flash("Session not found.", "error")
+        return redirect(url_for("dynamic_analysis"))
+    
+    return render_template("dynamic_detail.html", session=details['session'])
+
+
+@app.route("/live_captures/<int:session_id>")
+def live_captures(session_id):
+    """Live capture events for a session"""
+    event_type_filter = request.args.get("event_type", "all")
+    severity_filter = request.args.get("severity", "all")
+    
+    manager = get_analysis_manager()
+    details = manager.get_session_details(session_id)
+    
+    if not details:
+        flash("Session not found.", "error")
+        return redirect(url_for("dynamic_analysis"))
+    
+    captures = manager.get_filtered_captures(
+        session_id,
+        event_type=event_type_filter if event_type_filter != "all" else None,
+        severity=severity_filter if severity_filter != "all" else None
+    )
+    
+    return render_template(
+        "live_captures.html",
+        session=details['session'],
+        captures=captures,
+        summary=details['capture_summary']
+    )
+
+
+@app.route("/api/dynamic/clear", methods=["POST"])
+def api_clear_dynamic():
+    """Clear all dynamic analysis sessions"""
+    try:
+        conn = database.get_connection()
+        conn.execute("DELETE FROM live_captures")
+        conn.execute("DELETE FROM dynamic_sessions")
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error(f"Error clearing dynamic sessions: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/health")
