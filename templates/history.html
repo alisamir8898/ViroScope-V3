@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}History{% endblock %}
+{% block content %}
+<div class="topbar">
+    <div>
+        <h1>Scan History</h1>
+        <div class="subtitle">{{ stats.total }} scans recorded locally</div>
+    </div>
+    {% if records %}
+    <form method="POST" action="{{ url_for('api_clear_history') }}" onsubmit="return confirm('متأكد عايز تمسح كل السجل التاريخي؟');">
+        <button type="submit" class="btn btn-danger btn-sm">Clear History</button>
+    </form>
+    {% endif %}
+</div>
+
+<div class="content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    <form method="GET" class="filter-bar">
+        <input type="text" name="q" placeholder="Search file name or hash…" value="{{ search }}">
+        <select name="verdict" onchange="this.form.submit()">
+            <option value="all" {{ 'selected' if verdict_filter == 'all' }}>All verdicts</option>
+            <option value="Malicious" {{ 'selected' if verdict_filter == 'Malicious' }}>Malicious only</option>
+            <option value="Benign" {{ 'selected' if verdict_filter == 'Benign' }}>Benign only</option>
+            <option value="Error" {{ 'selected' if verdict_filter == 'Error' }}>Errors only</option>
+        </select>
+        <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+    </form>
+
+    <div class="panel">
+        {% if records %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Verdict</th>
+                    <th>Confidence</th>
+                    <th>VirusTotal</th>
+                    <th>Scanned</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records %}
+                <tr>
+                    <td class="fname-cell" style="cursor:pointer;" onclick="window.location='{{ url_for('history_detail', scan_id=r.id) }}'">{{ r.file_name }}</td>
+                    <td>
+                        {% if r.verdict == 'Malicious' %}
+                            <span class="verdict-badge verdict-malicious">Malicious</span>
+                        {% elif r.verdict == 'Benign' %}
+                            <span class="verdict-badge verdict-benign">Benign</span>
+                        {% else %}
+                            <span class="verdict-badge verdict-error">Error</span>
+                        {% endif %}
+                    </td>
+                    <td class="mono">{{ '%.1f'|format(r.confidence * 100) + '%' if r.confidence is not none else '—' }}</td>
+                    <td class="mono">{% if r.vt_total %}{{ r.vt_malicious }}/{{ r.vt_total }}{% else %}—{% endif %}</td>
+                    <td class="mono text-tertiary">{{ r.created_at[:19].replace('T', ' ') }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('api_delete_scan', scan_id=r.id) }}" onsubmit="return confirm('Delete this record?');">
+                            <button type="submit" class="btn btn-secondary btn-sm" style="padding:4px 10px;">✕</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="ee-icon">∅</div>
+            <p>مفيش نتائج تطابق الفلتر ده.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

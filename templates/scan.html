@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Single Scan{% endblock %}
+{% block content %}
+<div class="topbar">
+    <div>
+        <h1>Single File Scan</h1>
+        <div class="subtitle">Upload one executable for ML classification + VirusTotal lookup</div>
+    </div>
+</div>
+
+<div class="content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    <form method="POST" enctype="multipart/form-data" id="scan-form">
+        <div class="panel">
+            <span class="eyebrow">Step 01</span>
+            <span class="section-title">Select a file</span>
+
+            <label class="dropzone" id="dropzone">
+                <div class="dz-icon">⌖</div>
+                <div class="dz-text">Drop a file here or click to browse</div>
+                <div class="dz-hint">.exe · .dll · .sys · .scr · .ocx — max 64MB</div>
+                <input type="file" name="file" id="file-input" required>
+            </label>
+            <div class="file-chip-list" id="file-chip-list"></div>
+        </div>
+
+        <div class="panel">
+            <span class="eyebrow">Step 02</span>
+            <span class="section-title">Options</span>
+
+            <div class="field-row">
+                <div>
+                    <div>Check against VirusTotal</div>
+                    <div class="text-tertiary" style="font-size:12px;">Looks up the file's hash on VirusTotal (no upload unless unknown)</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" name="check_vt" value="1" {{ 'checked' if vt_enabled else 'disabled' }} {{ 'checked' if vt_enabled }}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
+            <span class="mono">▶</span> Run Analysis
+        </button>
+    </form>
+</div>
+
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+const chipList = document.getElementById('file-chip-list');
+const form = document.getElementById('scan-form');
+const submitBtn = document.getElementById('submit-btn');
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function renderChip() {
+    chipList.innerHTML = '';
+    if (fileInput.files.length > 0) {
+        const f = fileInput.files[0];
+        chipList.innerHTML = `<div class="file-chip"><span class="fname mono">${f.name}</span><span class="fsize mono">${formatSize(f.size)}</span></div>`;
+    }
+}
+
+fileInput.addEventListener('change', renderChip);
+
+['dragover', 'dragenter'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('dragover'); })
+);
+['dragleave', 'drop'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('dragover'); })
+);
+dropzone.addEventListener('drop', e => {
+    if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        renderChip();
+    }
+});
+
+form.addEventListener('submit', () => {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="mono">◌</span> Analyzing…';
+});
+</script>
+{% endblock %}

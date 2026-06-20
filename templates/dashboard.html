@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="topbar">
+    <div>
+        <h1>Dashboard</h1>
+        <div class="subtitle">Overview of all scans run on this machine</div>
+    </div>
+    <a href="{{ url_for('scan') }}" class="btn btn-primary">+ New Scan</a>
+</div>
+
+<div class="content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    <div class="grid-stats">
+        <div class="stat-card accent-cyan">
+            <div class="stat-value mono">{{ stats.total }}</div>
+            <div class="stat-label">Total Scans</div>
+        </div>
+        <div class="stat-card accent-red">
+            <div class="stat-value mono" style="color: var(--signal-red);">{{ stats.malicious }}</div>
+            <div class="stat-label">Malicious</div>
+        </div>
+        <div class="stat-card accent-green">
+            <div class="stat-value mono" style="color: var(--signal-green);">{{ stats.benign }}</div>
+            <div class="stat-label">Benign</div>
+        </div>
+        <div class="stat-card accent-amber">
+            <div class="stat-value mono" style="color: var(--signal-amber);">{{ stats.errors }}</div>
+            <div class="stat-label">Errors</div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="section-title">Recent Activity</span>
+            <a href="{{ url_for('history') }}" class="text-secondary" style="font-size:13px;">View all →</a>
+        </div>
+
+        {% if recent %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Verdict</th>
+                    <th>Confidence</th>
+                    <th>VirusTotal</th>
+                    <th>Scanned</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in recent %}
+                <tr onclick="window.location='{{ url_for('history_detail', scan_id=r.id) }}'" style="cursor:pointer;">
+                    <td class="fname-cell">{{ r.file_name }}</td>
+                    <td>
+                        {% if r.verdict == 'Malicious' %}
+                            <span class="verdict-badge verdict-malicious">Malicious</span>
+                        {% elif r.verdict == 'Benign' %}
+                            <span class="verdict-badge verdict-benign">Benign</span>
+                        {% else %}
+                            <span class="verdict-badge verdict-error">Error</span>
+                        {% endif %}
+                    </td>
+                    <td class="mono">{{ '%.1f'|format(r.confidence * 100) + '%' if r.confidence is not none else '—' }}</td>
+                    <td class="mono">
+                        {% if r.vt_total %}{{ r.vt_malicious }}/{{ r.vt_total }}{% else %}—{% endif %}
+                    </td>
+                    <td class="mono text-tertiary">{{ r.created_at[:19].replace('T', ' ') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="ee-icon">∅</div>
+            <p>لسه مفيش أي فحوصات. <a href="{{ url_for('scan') }}">ابدأ أول فحص</a></p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

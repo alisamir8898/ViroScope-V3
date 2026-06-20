@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Batch Scan{% endblock %}
+{% block content %}
+<div class="topbar">
+    <div>
+        <h1>Batch Scan</h1>
+        <div class="subtitle">Upload multiple executables to scan them all in one pass</div>
+    </div>
+</div>
+
+<div class="content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    <form method="POST" enctype="multipart/form-data" id="batch-form">
+        <div class="panel">
+            <span class="eyebrow">Step 01</span>
+            <span class="section-title">Select files</span>
+
+            <label class="dropzone" id="dropzone">
+                <div class="dz-icon">⌖</div>
+                <div class="dz-text">Drop multiple files here or click to browse</div>
+                <div class="dz-hint">.exe · .dll · .sys · .scr · .ocx — max 64MB each</div>
+                <input type="file" name="files" id="file-input" multiple required>
+            </label>
+            <div class="file-chip-list" id="file-chip-list"></div>
+        </div>
+
+        <div class="panel">
+            <span class="eyebrow">Step 02</span>
+            <span class="section-title">Options</span>
+            <div class="field-row">
+                <div>
+                    <div>Check each file against VirusTotal</div>
+                    <div class="text-tertiary" style="font-size:12px;">Slower for large batches since each file is hash-looked-up individually</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" name="check_vt" value="1" {{ 'checked' if vt_enabled else 'disabled' }} {{ 'checked' if vt_enabled }}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
+            <span class="mono">▤</span> Run Batch Analysis
+        </button>
+    </form>
+</div>
+
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+const chipList = document.getElementById('file-chip-list');
+const form = document.getElementById('batch-form');
+const submitBtn = document.getElementById('submit-btn');
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function renderChips() {
+    chipList.innerHTML = '';
+    Array.from(fileInput.files).forEach(f => {
+        const chip = document.createElement('div');
+        chip.className = 'file-chip';
+        chip.innerHTML = `<span class="fname mono">${f.name}</span><span class="fsize mono">${formatSize(f.size)}</span>`;
+        chipList.appendChild(chip);
+    });
+}
+
+fileInput.addEventListener('change', renderChips);
+
+['dragover', 'dragenter'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('dragover'); })
+);
+['dragleave', 'drop'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('dragover'); })
+);
+dropzone.addEventListener('drop', e => {
+    if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        renderChips();
+    }
+});
+
+form.addEventListener('submit', () => {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="mono">◌</span> Analyzing ' + fileInput.files.length + ' files…';
+});
+</script>
+{% endblock %}

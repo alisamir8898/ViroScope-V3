@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}404{% endblock %}
+{% block content %}
+<div class="content" style="margin: 0 auto;">
+    <div class="empty-state">
+        <div class="ee-icon">404</div>
+        <p>الصفحة مش موجودة. <a href="{{ url_for('dashboard') }}">رجوع للداشبورد</a></p>
+    </div>
+</div>
+{% endblock %}

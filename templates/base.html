@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ViroScope{% endblock %} — ViroScope</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body dir="ltr">
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="logo"><span class="dot"></span>VIROSCOPE</div>
+                <div class="tagline">Malware Triage Console</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">
+                    <span class="icon">▣</span> Dashboard
+                </a>
+                <a href="{{ url_for('scan') }}" class="{{ 'active' if request.endpoint == 'scan' }}">
+                    <span class="icon">▶</span> Single Scan
+                </a>
+                <a href="{{ url_for('batch') }}" class="{{ 'active' if request.endpoint == 'batch' }}">
+                    <span class="icon">▤</span> Batch Scan
+                </a>
+                <a href="{{ url_for('history') }}" class="{{ 'active' if request.endpoint in ['history', 'history_detail'] }}">
+                    <span class="icon">▥</span> History
+                </a>
+            </nav>
+            <div class="sidebar-status">
+                <div class="status-pill">
+                    <span class="led {{ 'led-on' if model_ready else 'led-off' }}"></span>
+                    ML Model: {{ 'Ready' if model_ready else 'Offline' }}
+                </div>
+                <div class="status-pill" style="margin-top: 8px;">
+                    <span class="led {{ 'led-on' if vt_enabled else 'led-warn' }}"></span>
+                    VirusTotal: {{ 'Connected' if vt_enabled else 'Not Configured' }}
+                </div>
+            </div>
+        </aside>
+
+        <div class="main">
+            {% block content %}{% endblock %}
+            <footer class="app-footer">ViroScope · running locally on 127.0.0.1:5000 · RandomForest PE classifier + VirusTotal v3</footer>
+        </div>
+    </div>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

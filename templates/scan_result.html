@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Scan Result{% endblock %}
+{% block content %}
+<div class="topbar">
+    <div>
+        <h1>Scan Result</h1>
+        <div class="subtitle">{{ result.file_name }}</div>
+    </div>
+    <a href="{{ url_for('scan') }}" class="btn btn-secondary">Scan Another</a>
+</div>
+
+<div class="content">
+    {% set ml = result.ml %}
+    {% set state = 'error' if not ml.success else ('malicious' if ml.is_malware else 'benign') %}
+
+    <div class="result-hero is-{{ state }}">
+        <div class="scan-ring ring-{{ state }}">
+            {% if state == 'malicious' %}✕{% elif state == 'benign' %}✓{% else %}!{% endif %}
+        </div>
+        <div class="result-hero-body">
+            {% if not ml.success %}
+                <h2 style="color: var(--signal-amber);">Analysis Failed</h2>
+                <p class="text-secondary">{{ ml.error }}</p>
+            {% else %}
+                <h2 style="color: {{ 'var(--signal-red)' if ml.is_malware else 'var(--signal-green)' }};">
+                    {{ 'Malicious' if ml.is_malware else 'Benign' }}
+                </h2>
+                <div class="fname-line">{{ result.file_name }}</div>
+                {% if ml.confidence is not none %}
+                <div class="text-secondary" style="margin-top:8px; font-size:13px;">
+                    Model confidence: <span class="mono" style="color:var(--text-primary);">{{ '%.1f'|format(ml.confidence * 100) }}%</span>
+                </div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    {% if ml.success %}
+    <div class="panel">
+        <span class="section-title">Why the model decided this</span>
+        <p class="text-secondary" style="font-size:13.5px; margin-bottom:16px;">
+            The most influential features for this prediction, ranked by the model's global feature importance, alongside this file's actual value for each.
+        </p>
+        {% for feat in ml.top_features %}
+        <div style="margin-bottom: 12px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+                <span class="mono text-secondary">{{ feat.feature }}</span>
+                <span class="mono" style="color:var(--text-primary);">{{ feat.value }}</span>
+            </div>
+            <div class="feature-bar-track">
+                <div class="feature-bar-fill" style="width: {{ (feat.importance * 100 / ml.top_features[0].importance) | round(1) }}%;"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if result.vt %}
+    <div class="panel">
+        <span class="section-title">VirusTotal</span>
+        {% if result.vt.found %}
+            <div style="display:flex; align-items:center; gap: 16px; margin-bottom: 16px;">
+                <div class="stat-value mono" style="font-size:24px; color: {{ 'var(--signal-red)' if result.vt.malicious > 0 else 'var(--signal-green)' }};">
+                    {{ result.vt.detection_ratio }}
+                </div>
+                <div class="text-secondary" style="font-size:13px;">security vendors flagged this file as malicious/suspicious</div>
+            </div>
+            <a href="{{ result.vt.permalink }}" target="_blank" class="btn btn-secondary btn-sm">Open full report on VirusTotal ↗</a>
+
+            {% if result.vt.engines %}
+            <hr class="divider">
+            <table class="data-table">
+                <thead><tr><th>Engine</th><th>Result</th></tr></thead>
+                <tbody>
+                {% for e in result.vt.engines[:15] %}
+                    <tr>
+                        <td class="mono">{{ e.engine }}</td>
+                        <td>
+                            {% if e.category in ['malicious', 'suspicious'] %}
+                                <span class="mono" style="color:var(--signal-red);">{{ e.result or e.category }}</span>
+                            {% else %}
+                                <span class="mono text-tertiary">{{ e.result or 'Clean' }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        {% elif result.vt.pending %}
+            <p class="text-secondary">لسه مش موجود تقرير على VirusTotal — الملف اترفع وبيتم تحليله، حاول تاني بعد دقيقة.</p>
+        {% elif result.vt.error %}
+            <p class="text-secondary">{{ result.vt.error }}</p>
+        {% else %}
+            <p class="text-secondary">الملف ده مش موجود في قاعدة بيانات VirusTotal لسه.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="panel">
+        <span class="section-title">File Info</span>
+        <table class="data-table">
+            <tbody>
+                <tr><td class="text-tertiary" style="width:160px;">SHA-256</td><td class="mono" style="word-break:break-all;">{{ result.sha256 or '—' }}</td></tr>
+                <tr><td class="text-tertiary">Size</td><td class="mono">{{ result.file_size }} bytes</td></tr>
+                <tr><td class="text-tertiary">Scanned at</td><td class="mono">{{ result.timestamp[:19].replace('T', ' ') }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

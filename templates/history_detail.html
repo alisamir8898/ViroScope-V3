@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Scan Detail{% endblock %}
+{% block content %}
+<div class="topbar">
+    <div>
+        <h1>Scan Detail</h1>
+        <div class="subtitle">{{ record.file_name }}</div>
+    </div>
+    <a href="{{ url_for('history') }}" class="btn btn-secondary">← Back to History</a>
+</div>
+
+<div class="content">
+    {% set state = 'error' if record.verdict == 'Error' else ('malicious' if record.verdict == 'Malicious' else 'benign') %}
+    <div class="result-hero is-{{ state }}">
+        <div class="scan-ring ring-{{ state }}">
+            {% if state == 'malicious' %}✕{% elif state == 'benign' %}✓{% else %}!{% endif %}
+        </div>
+        <div class="result-hero-body">
+            <h2 style="color: {{ 'var(--signal-red)' if state == 'malicious' else ('var(--signal-green)' if state == 'benign' else 'var(--signal-amber)') }};">
+                {{ record.verdict }}
+            </h2>
+            <div class="fname-line">{{ record.file_name }}</div>
+            {% if record.confidence is not none %}
+            <div class="text-secondary" style="margin-top:8px; font-size:13px;">
+                Confidence: <span class="mono" style="color:var(--text-primary);">{{ '%.1f'|format(record.confidence * 100) }}%</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% set ml = record.raw_result.ml if record.raw_result is mapping else None %}
+    {% if ml and ml.top_features %}
+    <div class="panel">
+        <span class="section-title">Feature Contributions</span>
+        {% for feat in ml.top_features %}
+        <div style="margin-bottom: 12px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+                <span class="mono text-secondary">{{ feat.feature }}</span>
+                <span class="mono" style="color:var(--text-primary);">{{ feat.value }}</span>
+            </div>
+            <div class="feature-bar-track">
+                <div class="feature-bar-fill" style="width: {{ (feat.importance * 100 / ml.top_features[0].importance) | round(1) }}%;"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% set vt = record.raw_result.vt if record.raw_result is mapping else None %}
+    {% if vt and vt.found %}
+    <div class="panel">
+        <span class="section-title">VirusTotal</span>
+        <div style="display:flex; align-items:center; gap: 16px; margin-bottom: 12px;">
+            <div class="stat-value mono" style="font-size:24px; color: {{ 'var(--signal-red)' if vt.malicious > 0 else 'var(--signal-green)' }};">
+                {{ vt.detection_ratio }}
+            </div>
+            <div class="text-secondary" style="font-size:13px;">vendors flagged this file</div>
+        </div>
+        <a href="{{ vt.permalink }}" target="_blank" class="btn btn-secondary btn-sm">Open on VirusTotal ↗</a>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+        <span class="section-title">File Info</span>
+        <table class="data-table">
+            <tbody>
+                <tr><td class="text-tertiary" style="width:160px;">SHA-256</td><td class="mono" style="word-break:break-all;">{{ record.sha256 or '—' }}</td></tr>
+                <tr><td class="text-tertiary">Size</td><td class="mono">{{ record.file_size or '—' }} bytes</td></tr>
+                <tr><td class="text-tertiary">Batch ID</td><td class="mono">{{ record.batch_id or '— (single scan)' }}</td></tr>
+                <tr><td class="text-tertiary">Scanned at</td><td class="mono">{{ record.created_at[:19].replace('T', ' ') }}</td></tr>
+                {% if record.ml_error %}
+                <tr><td class="text-tertiary">Error</td><td class="mono" style="color:var(--signal-amber);">{{ record.ml_error }}</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

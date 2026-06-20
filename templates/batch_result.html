@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Batch Results{% endblock %}
+{% block content %}
+<div class="topbar">
+    <div>
+        <h1>Batch Results</h1>
+        <div class="subtitle">{{ summary.total }} files analyzed</div>
+    </div>
+    <a href="{{ url_for('batch') }}" class="btn btn-secondary">Run Another Batch</a>
+</div>
+
+<div class="content">
+    <div class="grid-stats">
+        <div class="stat-card accent-cyan">
+            <div class="stat-value mono">{{ summary.total }}</div>
+            <div class="stat-label">Total Files</div>
+        </div>
+        <div class="stat-card accent-red">
+            <div class="stat-value mono" style="color: var(--signal-red);">{{ summary.malicious }}</div>
+            <div class="stat-label">Malicious</div>
+        </div>
+        <div class="stat-card accent-green">
+            <div class="stat-value mono" style="color: var(--signal-green);">{{ summary.benign }}</div>
+            <div class="stat-label">Benign</div>
+        </div>
+        <div class="stat-card accent-amber">
+            <div class="stat-value mono" style="color: var(--signal-amber);">{{ summary.errors }}</div>
+            <div class="stat-label">Errors</div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <span class="section-title">Results</span>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Verdict</th>
+                    <th>Confidence</th>
+                    <th>VirusTotal</th>
+                    <th>SHA-256</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in results %}
+                <tr>
+                    <td class="fname-cell">{{ r.file_name }}</td>
+                    <td>
+                        {% if not r.ml.success %}
+                            <span class="verdict-badge verdict-error">Error</span>
+                        {% elif r.ml.is_malware %}
+                            <span class="verdict-badge verdict-malicious">Malicious</span>
+                        {% else %}
+                            <span class="verdict-badge verdict-benign">Benign</span>
+                        {% endif %}
+                    </td>
+                    <td class="mono">
+                        {% if r.ml.success and r.ml.confidence is not none %}{{ '%.1f'|format(r.ml.confidence * 100) }}%{% else %}—{% endif %}
+                    </td>
+                    <td class="mono">
+                        {% if r.vt and r.vt.found %}{{ r.vt.detection_ratio }}{% elif r.vt and r.vt.pending %}pending{% else %}—{% endif %}
+                    </td>
+                    <td class="mono text-tertiary" style="font-size:11px;">{{ (r.sha256[:16] + '…') if r.sha256 else '—' }}</td>
+                </tr>
+                {% if not r.ml.success %}
+                <tr><td colspan="5" class="text-tertiary" style="font-size:12px; padding-top:0;">↳ {{ r.ml.error }}</td></tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <a href="{{ url_for('history') }}?verdict=all" class="btn btn-secondary">View in History →</a>
+</div>
+{% endblock %}
