@@ -77,7 +77,7 @@ def save_upload(file_storage):
     return saved_path, original_name
 
 
-def run_full_analysis(saved_path, original_name, check_vt=True, run_dynamic=False):
+def run_full_analysis(saved_path, original_name, check_vt=True, run_dynamic=False, batch_id=None):
     """ML prediction + optional VirusTotal lookup + history persistence + optional dynamic analysis."""
     ml_result = predict_file(saved_path)
 
@@ -94,6 +94,7 @@ def run_full_analysis(saved_path, original_name, check_vt=True, run_dynamic=Fals
         file_size=file_size,
         ml_result=ml_result,
         vt_result=vt_result,
+        batch_id=batch_id,
     )
 
     dynamic_result = None
@@ -210,36 +211,14 @@ def batch():
 
         saved_path, original_name = save_upload(file)
         try:
-            ml_result = predict_file(saved_path)
-            file_size = os.path.getsize(saved_path) if os.path.exists(saved_path) else None
-            sha256 = VirusTotalScanner.sha256_of(saved_path) if os.path.exists(saved_path) else None
-
-            vt_result = None
-            if check_vt and vt_scanner.enabled and sha256:
-                vt_result = vt_scanner.lookup_hash(sha256)
-
-            dynamic_result = None
-            if run_dynamic:
-                dynamic_result = dynamic_manager.run_full_analysis(saved_path)
-
-            database.save_scan(
-                file_name=original_name,
-                sha256=sha256,
-                file_size=file_size,
-                ml_result=ml_result,
-                vt_result=vt_result,
-                dynamic_result=dynamic_result,
-                batch_id=batch_id,
+            result = run_full_analysis(
+                saved_path, 
+                original_name, 
+                check_vt=check_vt, 
+                run_dynamic=run_dynamic, 
+                batch_id=batch_id
             )
-
-            results.append({
-                "file_name": original_name,
-                "sha256": sha256,
-                "file_size": file_size,
-                "ml": ml_result,
-                "vt": vt_result,
-                "dynamic": dynamic_result,
-            })
+            results.append(result)
         finally:
             if os.path.exists(saved_path):
                 os.remove(saved_path)
