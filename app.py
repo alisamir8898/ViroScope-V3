@@ -101,6 +101,19 @@ def run_full_analysis(saved_path, original_name, check_vt=True, run_dynamic=Fals
         try:
             manager = get_analysis_manager()
             dynamic_result = manager.run_analysis(saved_path, scan_id=scan_id, original_name=original_name)
+            
+            # INTEGRATION: Override ML verdict if dynamic analysis shows high risk
+            if dynamic_result.get('success'):
+                risk_score = dynamic_result.get('risk_score', 0)
+                if risk_score >= 0.6: # If risk is High or Critical
+                    new_verdict = "Malicious"
+                    # If ML was wrong, update the database to reflect dynamic findings
+                    if ml_result.get('verdict') != "Malicious":
+                        database.update_scan_verdict(scan_id, "Malicious", confidence=risk_score)
+                        # Update local dict for the immediate response
+                        ml_result['verdict'] = "Malicious"
+                        ml_result['confidence'] = risk_score
+                        ml_result['is_malware'] = True
         except Exception as e:
             logger.error(f"Error running dynamic analysis: {e}")
             dynamic_result = {"error": str(e)}
@@ -182,6 +195,7 @@ def batch():
         return redirect(url_for("batch"))
 
     check_vt = request.form.get("check_vt", "1") == "1"
+    run_dynamic = request.form.get("run_dynamic") == "1"
     batch_id = uuid.uuid4().hex
     results = []
 
@@ -204,12 +218,17 @@ def batch():
             if check_vt and vt_scanner.enabled and sha256:
                 vt_result = vt_scanner.lookup_hash(sha256)
 
+            dynamic_result = None
+            if run_dynamic:
+                dynamic_result = dynamic_manager.run_full_analysis(saved_path)
+
             database.save_scan(
                 file_name=original_name,
                 sha256=sha256,
                 file_size=file_size,
                 ml_result=ml_result,
                 vt_result=vt_result,
+                dynamic_result=dynamic_result,
                 batch_id=batch_id,
             )
 
@@ -219,6 +238,7 @@ def batch():
                 "file_size": file_size,
                 "ml": ml_result,
                 "vt": vt_result,
+                "dynamic": dynamic_result,
             })
         finally:
             if os.path.exists(saved_path):
@@ -334,6 +354,10 @@ def monitor():
         query += " AND threat_level = ?"
         params.append(threat_filter)
     
+    if event_type != "all":
+        query += " AND event_type = ?"
+        params.append(event_type)
+    
     if search:
         query += " AND (process_name LIKE ? OR file_path LIKE ? OR details LIKE ?)"
         params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
@@ -441,8 +465,15 @@ if __name__ == "__main__":
     print("  Running locally at http://127.0.0.1:5000")
     print("=" * 60)
     
-    # Start the real-time intelligence monitor in the background
+    # System-wide monitor is enabled
     monitor_instance.start()
+    
+    # Clear old general logs to start fresh with targeted monitoring
+    try:
+        database.clear_monitor_events()
+    except:
+        pass
+        
     try:
         # OPTIMIZATION: Disable auto-reloader and watchdog to prevent constant restarts
         # This significantly improves performance when running in development mode

@@ -8,12 +8,17 @@ from datetime import datetime
 from malware_types import MalwareTypeDetector
 import database
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure logging to a dedicated file
+import os
+log_file = os.path.join(os.path.dirname(__file__), 'realtime_monitor.log')
+file_handler = logging.FileHandler(log_file)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
 logger = logging.getLogger('RealTimeMonitor')
+logger.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+# Also add stream handler to see logs in console
+logger.addHandler(logging.StreamHandler())
 
 class RealTimeMonitor:
     def __init__(self):
@@ -30,10 +35,12 @@ class RealTimeMonitor:
         with self.lock:
             if not self.is_running:
                 self.is_running = True
+                # Force log creation/update
+                logger.info("Initializing Real-time Intelligence Monitor...")
                 self.known_pids = {p.pid for p in psutil.process_iter()}
                 self.monitor_thread = threading.Thread(target=self._run_monitor, daemon=True)
                 self.monitor_thread.start()
-                logger.info("Real-time Intelligence Monitor started.")
+                logger.info(f"Real-time Intelligence Monitor started with {len(self.known_pids)} existing processes.")
 
     def stop(self):
         """Stop the monitoring thread"""
@@ -142,3 +149,5 @@ class RealTimeMonitor:
 
 # Global instance
 monitor_instance = RealTimeMonitor()
+
+

@@ -56,7 +56,15 @@
                             <span class="verdict-badge verdict-error">Error</span>
                         {% endif %}
                     </td>
-                    <td class="mono">{{ '%.1f'|format(r.confidence * 100) + '%' if r.confidence is not none else '—' }}</td>
+                    <td class="mono">
+                        {% if r.confidence is not none %}
+                            {# Normalize confidence if it's already stored as a percentage #}
+                            {% set display_conf = (r.confidence if r.confidence <= 1.0 else (r.confidence / 100.0)) %}
+                            {{ '%.1f'|format(display_conf * 100) }}%
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
                     <td class="mono">
                         {% if r.vt_total %}{{ r.vt_malicious }}/{{ r.vt_total }}{% else %}—{% endif %}
                     </td>

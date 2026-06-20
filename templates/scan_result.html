@@ -17,6 +17,7 @@
 </div>
 
 <div class="content">
+    <div class="report-container">
     {% set ml = result.ml %}
     {% set state = 'error' if not ml.success else ('malicious' if ml.is_malware else 'benign') %}
 
@@ -35,7 +36,8 @@
                 <div class="fname-line">{{ result.file_name }}</div>
                 {% if ml.confidence is not none %}
                 <div class="text-secondary" style="margin-top:8px; font-size:13px;">
-                    Model confidence: <span class="mono" style="color:var(--text-primary);">{{ '%.1f'|format(ml.confidence * 100) }}%</span>
+                    {% set display_conf = ml.confidence if ml.confidence <= 1.0 else ml.confidence / 100.0 %}
+                    Model confidence: <span class="mono" style="color:var(--text-primary);">{{ '%.1f'|format(display_conf * 100) }}%</span>
                 </div>
                 {% endif %}
             {% endif %}
@@ -127,6 +129,7 @@
                 <tr><td class="text-tertiary">Scanned at</td><td class="mono">{{ result.timestamp[:19].replace('T', ' ') }}</td></tr>
             </tbody>
         </table>
+    </div>
     </div>
 </div>
 {% endblock %}

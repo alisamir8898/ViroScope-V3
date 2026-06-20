@@ -210,8 +210,13 @@ body::before {
 
 .content {
   padding: 40px 48px;
-  max-width: 100%; /* Changed from 1200px to 100% to use full width */
+  max-width: 100%;
   width: 100%;
+}
+
+.report-container {
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 /* ==========================================================================
@@ -520,4 +525,91 @@ body::before {
   .main { margin-left: 0; }
   .topbar { padding: 16px 24px; }
   .content { padding: 24px; }
+}
+
+/* Dropdown / Select Customization for Dark Mode */
+select.btn-secondary {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--bg-panel-2) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--line) !important;
+  padding-right: 30px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+
+select.btn-secondary option {
+  background-color: var(--bg-panel);
+  color: var(--text-primary);
+  padding: 10px;
+}
+
+select.btn-secondary:focus {
+  outline: none;
+  border-color: var(--signal-cyan) !important;
+  box-shadow: 0 0 0 2px var(--signal-cyan-dim);
+}
+
+/* Toggle Switch Styling */
+.field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 22px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute; /* Ensure it doesn't take space */
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #21262d; /* Fixed dark color */
+  transition: .4s;
+  border-radius: 22px;
+  border: 1px solid #30363d;
+  display: block; /* Ensure visibility */
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--text-tertiary);
+  transition: .4s;
+  border-radius: 50%;
+}
+
+.toggle input:checked + .slider {
+  background-color: var(--signal-cyan-dim);
+  border-color: var(--signal-cyan);
+}
+
+.toggle input:checked + .slider:before {
+  transform: translateX(22px);
+  background-color: var(--signal-cyan);
+  box-shadow: 0 0 8px var(--signal-cyan);
+}
+
+.toggle input:disabled + .slider {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

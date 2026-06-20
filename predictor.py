@@ -104,7 +104,10 @@ def predict_file(file_path: str) -> dict:
         if hasattr(model, "predict_proba"):
             proba = model.predict_proba(features_df)[0]
             probabilities = {"benign": float(proba[0]), "malicious": float(proba[1])}
-            confidence = float(proba[1] if prediction == 1 else proba[0])
+            # Confidence should be the probability of the predicted class (0.0 to 1.0)
+            confidence = float(proba[prediction])
+            # Ensure confidence is clamped between 0 and 1
+            confidence = max(0.0, min(1.0, confidence))
     except Exception as exc:
         logger.exception("Prediction failed for %s", file_path)
         return {

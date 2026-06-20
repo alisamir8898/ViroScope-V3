@@ -6,7 +6,7 @@
     <title>{% block title %}ViroScope{% endblock %} — CyberSecurity Hub</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.1">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- SweetAlert2 -->
@@ -46,7 +46,7 @@
                     <i data-lucide="layers" class="nav-icon"></i> Bulk Analysis
                 </a>
                 <a href="{{ url_for('monitor') }}" class="{{ 'active' if request.endpoint == 'monitor' }}">
-                    <i data-lucide="activity" class="nav-icon"></i> Dynamic Monitor
+                    <i data-lucide="activity" class="nav-icon"></i> Real-Time Monitoring
                 </a>
                 <a href="{{ url_for('history') }}" class="{{ 'active' if request.endpoint in ['history', 'history_detail'] }}">
                     <i data-lucide="history" class="nav-icon"></i> Research History

@@ -22,7 +22,8 @@
             <div class="fname-line">{{ record.file_name }}</div>
             {% if record.confidence is not none %}
             <div class="text-secondary" style="margin-top:8px; font-size:13px;">
-                Confidence: <span class="mono" style="color:var(--text-primary);">{{ '%.1f'|format(record.confidence * 100) }}%</span>
+                {% set display_conf = record.confidence if record.confidence <= 1.0 else record.confidence / 100.0 %}
+                Confidence: <span class="mono" style="color:var(--text-primary);">{{ '%.1f'|format(display_conf * 100) }}%</span>
             </div>
             {% endif %}
         </div>

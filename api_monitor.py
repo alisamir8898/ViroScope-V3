@@ -27,7 +27,7 @@ def get_monitor_events(limit=50, offset=0, threat_level="all", event_type="all",
         params.append(threat_level)
     
     if event_type != "all":
-        query += " AND detected_type = ?"
+        query += " AND event_type = ?"
         params.append(event_type)
     
     if search:

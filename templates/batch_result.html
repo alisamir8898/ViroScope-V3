@@ -38,33 +38,38 @@
                     <th>Verdict</th>
                     <th>Confidence</th>
                     <th>VirusTotal</th>
-                    <th>SHA-256</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in results %}
-                <tr>
-                    <td class="fname-cell">{{ r.file_name }}</td>
-                    <td>
-                        {% if not r.ml.success %}
-                            <span class="verdict-badge verdict-error">Error</span>
-                        {% elif r.ml.is_malware %}
-                            <span class="verdict-badge verdict-malicious">Malicious</span>
-                        {% else %}
-                            <span class="verdict-badge verdict-benign">Benign</span>
-                        {% endif %}
-                    </td>
-                    <td class="mono">
-                        {% if r.ml.success and r.ml.confidence is not none %}{{ '%.1f'|format(r.ml.confidence * 100) }}%{% else %}—{% endif %}
-                    </td>
-                    <td class="mono">
-                        {% if r.vt and r.vt.found %}{{ r.vt.detection_ratio }}{% elif r.vt and r.vt.pending %}pending{% else %}—{% endif %}
-                    </td>
-                    <td class="mono text-tertiary" style="font-size:11px;">{{ (r.sha256[:16] + '…') if r.sha256 else '—' }}</td>
-                </tr>
-                {% if not r.ml.success %}
-                <tr><td colspan="5" class="text-tertiary" style="font-size:12px; padding-top:0;">↳ {{ r.ml.error }}</td></tr>
-                {% endif %}
+	                    <th>SHA-256</th>
+	                </tr>
+	            </thead>
+	            <tbody>
+	                {% for r in results %}
+	                <tr>
+	                    <td class="fname-cell">{{ r.file_name }}</td>
+	                    <td>
+	                        {% if not r.ml.success %}
+	                            <span class="verdict-badge verdict-error">Error</span>
+	                        {% elif r.ml.is_malware %}
+	                            <span class="verdict-badge verdict-malicious">Malicious</span>
+	                        {% else %}
+	                            <span class="verdict-badge verdict-benign">Benign</span>
+	                        {% endif %}
+	                    </td>
+	                    <td class="mono">
+	                        {% if r.ml.success and r.ml.confidence is not none %}
+	                            {% set display_conf = (r.ml.confidence if r.ml.confidence <= 1.0 else (r.ml.confidence / 100.0)) %}
+	                            {{ '%.1f'|format(display_conf * 100) }}%
+	                        {% else %}
+	                            —
+	                        {% endif %}
+	                    </td>
+	                    <td class="mono">
+	                        {% if r.vt and r.vt.found %}{{ r.vt.detection_ratio }}{% elif r.vt and r.vt.pending %}pending{% else %}—{% endif %}
+	                    </td>
+	                    <td class="mono text-tertiary" style="font-size:11px;">{{ (r.sha256[:16] + '…') if r.sha256 else '—' }}</td>
+	                </tr>
+	                {% if not r.ml.success %}
+	                <tr><td colspan="5" class="text-tertiary" style="font-size:12px; padding-top:0;">↳ {{ r.ml.error }}</td></tr>
+	                {% endif %}
                 {% endfor %}
             </tbody>
         </table>

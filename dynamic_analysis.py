@@ -478,15 +478,18 @@ class DynamicAnalyzer:
     
     def _determine_malware_type(self, behavioral_indicators):
         """Determine potential malware type based on behavioral indicators"""
+        if not behavioral_indicators:
+            return {'likely_type': "Clean", 'type_scores': {}}
+
         indicators_text = ' '.join(behavioral_indicators).lower()
         
-        # قمنا بتوسيع الكلمات لتشمل سياق المؤشرات السلوكية الجديدة
+        # Enhanced patterns for better categorization
         malware_types = {
-            'ransomware': ['encrypt', 'bitcoin', 'ransom', 'payment', 'decrypt', 'locked'],
-            'trojan': ['backdoor', 'remote', 'hidden', 'stealth', 'keylog', 'suspicious process', 'spawned'],
-            'worm': ['propagate', 'spread', 'network', 'multiple', 'replicate', 'connections'],
-            'spyware': ['monitor', 'spy', 'screen', 'keylog', 'surveillance', 'download'],
-            'virus': ['infect', 'system file', 'corrupt', 'overwrite', 'executable file']
+            'Ransomware': ['encrypt', 'bitcoin', 'ransom', 'payment', 'decrypt', 'locked', 'vssadmin', 'delete shadows', 'crypt'],
+            'Trojan': ['backdoor', 'remote', 'hidden', 'stealth', 'keylog', 'suspicious process', 'spawned', 'inject', 'rat', 'persistence'],
+            'Worm': ['propagate', 'spread', 'network', 'multiple', 'replicate', 'connections', 'smb', 'autorun', 'usb'],
+            'Spyware': ['monitor', 'spy', 'screen', 'keylog', 'surveillance', 'download', 'exfiltrate', 'camera', 'microphone'],
+            'Virus': ['infect', 'system file', 'corrupt', 'overwrite', 'executable file', 'entrypoint', 'self-modify']
         }
         
         scores = {}
@@ -494,16 +497,16 @@ class DynamicAnalyzer:
             score = 0
             for pattern in patterns:
                 if pattern in indicators_text:
-                    score += 2 # رفعنا الوزن النسبي للمطابقة لزيادة دقة الاسكور
+                    # Weight by pattern importance
+                    if pattern in ['encrypt', 'ransom', 'backdoor', 'keylog', 'replicate']:
+                        score += 5
+                    else:
+                        score += 2
             scores[malware_type] = score
             
-        max_score = 0
-        likely_type = "Unknown"
-        
-        for malware_type, score in scores.items():
-            if score > max_score:
-                max_score = score
-                likely_type = malware_type
+        # Get highest score
+        sorted_types = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        likely_type = sorted_types[0][0] if sorted_types and sorted_types[0][1] > 0 else "Suspicious"
                 
         return {
             'likely_type': likely_type,
@@ -512,35 +515,42 @@ class DynamicAnalyzer:
     
     def _calculate_risk_score(self, behavioral_indicators):
         """Calculate an overall risk score based on behavioral indicators"""
-        # تعديل لضمان إرجاع هيكل بيانات موحد دائماً لعدم كسر الـ Web App
         if not behavioral_indicators:
-            return {
-                'score': 0,
-                'risk_level': "Clean"
-            }
+            return {'score': 0, 'risk_level': "Clean"}
             
-        base_score = min(len(behavioral_indicators) * 15, 70) # رفعنا المعامل لـ 15 ليعطي رد فعل أقوى
+        # Base score starts higher for any behavioral indicators
+        base_score = 20 + (len(behavioral_indicators) * 10)
         
-        high_severity = [
-            "PowerShell execution policy bypass",
-            "Process launched with hidden window",
-            "Created executable file",
-            "Modified autorun location",
-            "Connected to suspicious network port",
-            "potential ransomware activity"
-        ]
+        # High severity weights
+        weights = {
+            "ransomware": 40,
+            "encrypt": 35,
+            "powershell": 25,
+            "hidden window": 20,
+            "executable file": 15,
+            "network port": 25,
+            "timeout": 10,
+            "suspicious process": 20,
+            "spawned": 15
+        }
         
-        severity_points = sum(10 for indicator in behavioral_indicators 
-                               if any(hs in indicator for hs in high_severity))
+        severity_points = 0
+        indicators_text = ' '.join(behavioral_indicators).lower()
+        for keyword, weight in weights.items():
+            if keyword in indicators_text:
+                severity_points += weight
         
+        # Normalize score to 0-100
         final_score = min(base_score + severity_points, 100)
         
-        if final_score < 35:
+        if final_score < 30:
             risk_level = "Low"
-        elif final_score < 75:
+        elif final_score < 60:
             risk_level = "Medium"
-        else:
+        elif final_score < 85:
             risk_level = "High"
+        else:
+            risk_level = "Critical"
         
         return {
             'score': final_score,

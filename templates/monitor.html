@@ -3,8 +3,8 @@
 {% block content %}
 <div class="topbar">
     <div>
-        <h1>Dynamic Monitor</h1>
-        <div class="subtitle">Live system-wide threat detection and event logging</div>
+        <h1>Real-Time Monitoring</h1>
+        <div class="subtitle">Live behavioral analysis and event tracking for analyzed files</div>
     </div>
     <div style="display: flex; gap: 12px;">
         <button id="refresh-btn" class="btn btn-secondary btn-sm"><i data-lucide="refresh-cw" style="width: 14px; height: 14px; margin-right: 6px;"></i> Refresh Logs</button>
@@ -119,7 +119,7 @@ async function updateMonitorEvents(page = 0) {
                 <tr>
                     <td colspan="5" style="text-align: center; padding: 64px 0;">
                         <div style="font-size: 48px; color: var(--line); margin-bottom: 16px;"><i data-lucide="activity" style="width: 48px; height: 48px;"></i></div>
-                        <p class="text-secondary">Monitor is active. No threat events captured in the current window.</p>
+                        <p class="text-secondary">Real-time monitoring is active. Start a scan to see live events.</p>
                     </td>
                 </tr>
             `;
@@ -158,7 +158,7 @@ async function updateMonitorEvents(page = 0) {
                     <div style="color: var(--text-secondary);">${event.file_path || event.details || '—'}</div>
                 </td>
                 <td>
-                    <span class="verdict-badge" style="background: rgba(255,255,255,0.05); color: var(--text-tertiary); border: 1px solid var(--line); font-size: 10px;">${event.detected_type || '—'}</span>
+                    <span class="verdict-badge" style="background: rgba(0, 255, 136, 0.08); color: var(--signal-cyan); border: 1px solid rgba(0, 255, 136, 0.3); font-size: 13px; font-weight: 800; letter-spacing: 0.5px; padding: 6px 14px;">${event.detected_type || '—'}</span>
                 </td>
             </tr>
         `).join('');

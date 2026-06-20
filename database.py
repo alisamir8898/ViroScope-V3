@@ -198,6 +198,24 @@ def save_scan(file_name, sha256, file_size, ml_result, vt_result=None, batch_id=
     return scan_id
 
 
+def update_scan_verdict(scan_id, verdict, confidence=None):
+    """Update the final verdict of a scan (e.g., after dynamic analysis)"""
+    conn = get_connection()
+    if confidence is not None:
+        conn.execute(
+            "UPDATE scans SET verdict = ?, confidence = ? WHERE id = ?",
+            (verdict, confidence, scan_id)
+        )
+    else:
+        conn.execute(
+            "UPDATE scans SET verdict = ? WHERE id = ?",
+            (verdict, scan_id)
+        )
+    conn.commit()
+    conn.close()
+    invalidate_stats_cache()
+
+
 def get_history(limit=100, offset=0, verdict_filter=None, search=None):
     conn = get_connection()
     query = "SELECT * FROM scans WHERE 1=1"
@@ -506,10 +524,10 @@ def get_monitor_stats():
     """Get statistics about monitor events"""
     conn = get_connection()
     total = conn.execute("SELECT COUNT(*) FROM monitor_events").fetchone()[0]
-    critical = conn.execute("SELECT COUNT(*) FROM monitor_events WHERE threat_level = 'critical'").fetchone()[0]
-    high = conn.execute("SELECT COUNT(*) FROM monitor_events WHERE threat_level = 'high'").fetchone()[0]
-    medium = conn.execute("SELECT COUNT(*) FROM monitor_events WHERE threat_level = 'medium'").fetchone()[0]
-    low = conn.execute("SELECT COUNT(*) FROM monitor_events WHERE threat_level = 'low'").fetchone()[0]
+    critical = conn.execute("SELECT COUNT(*) FROM monitor_events WHERE threat_level = 'Critical'").fetchone()[0]
+    high = conn.execute("SELECT COUNT(*) FROM monitor_events WHERE threat_level = 'High'").fetchone()[0]
+    medium = conn.execute("SELECT COUNT(*) FROM monitor_events WHERE threat_level = 'Medium'").fetchone()[0]
+    low = conn.execute("SELECT COUNT(*) FROM monitor_events WHERE threat_level = 'Low'").fetchone()[0]
     conn.close()
     return {
         "total": total,

@@ -32,7 +32,7 @@
     {% if dynamic_stats %}
     <div class="panel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
-            <span class="section-title">Dynamic Operations Monitor</span>
+            <span class="section-title">Real-Time Monitoring Operations</span>
             <a href="{{ url_for('dynamic_analysis') }}" class="btn btn-sm btn-secondary">View Operation Log →</a>
         </div>
         
@@ -87,7 +87,15 @@
                             <span class="verdict-badge verdict-error">Analysis Error</span>
                         {% endif %}
                     </td>
-                    <td class="mono">{{ '%.1f'|format(r.confidence * 100) + '%' if r.confidence is not none else '—' }}</td>
+                    <td class="mono">
+                        {% if r.confidence is not none %}
+                            {# Clamp confidence between 0 and 1 before multiplying by 100 #}
+                            {% set display_conf = (r.confidence if r.confidence <= 1.0 else (r.confidence / 100.0)) %}
+                            {{ '%.1f'|format(display_conf * 100) }}%
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
                     <td class="mono">
                         {% if r.vt_total %}{{ r.vt_malicious }}/{{ r.vt_total }}{% else %}—{% endif %}
                     </td>
