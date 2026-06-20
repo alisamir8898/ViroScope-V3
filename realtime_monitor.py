@@ -1,291 +1,144 @@
 import os
 import time
-import hashlib
 import psutil
 import threading
-import queue
 import logging
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+import sqlite3
+from datetime import datetime
 from malware_types import MalwareTypeDetector
-import importlib.util
-
-# Check if we can import the ML model
-if importlib.util.find_spec("joblib") is not None:
-    import joblib
-    has_ml_model = True
-    # Try to load the model
-    try:
-        model = joblib.load('ML_model/malwareclassifier-V2.pkl')
-        feature_extraction_module = __import__('feature_extraction')
-        def extract_features_for_file(file_path):
-            return feature_extraction_module.extract_features(file_path)
-    except:
-        has_ml_model = False
-else:
-    has_ml_model = False
+import database
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='realtime_monitor.log'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger('RealTimeMonitor')
 
-class MalwareMonitor:
-    def __init__(self, watch_directories=None, scan_interval=300):
-        """
-        Initialize the malware monitor
-        
-        Args:
-            watch_directories: List of directories to watch for new files
-            scan_interval: Interval in seconds for periodic system scans
-        """
-        self.watch_directories = watch_directories or []
-        self.scan_interval = scan_interval
-        self.file_queue = queue.Queue()
-        self.malware_detector = MalwareTypeDetector()
-        self.observer = Observer()
+class RealTimeMonitor:
+    def __init__(self):
+        self.detector = MalwareTypeDetector()
         self.is_running = False
-        self.workers = []
-        self.known_processes = set()
-        self.suspicious_files = {}
-        self.suspicious_processes = {}
-        
-    def start_monitoring(self, num_workers=2):
-        """Start the monitoring process"""
-        logger.info("Starting real-time malware monitoring")
-        self.is_running = True
-        
-        # Start file event handlers
-        for directory in self.watch_directories:
-            if os.path.exists(directory):
-                event_handler = FileCreatedHandler(self.file_queue)
-                self.observer.schedule(event_handler, directory, recursive=True)
-                logger.info(f"Watching directory: {directory}")
-        
-        # Start the file system observer
-        self.observer.start()
-        
-        # Start worker threads to process files
-        for i in range(num_workers):
-            worker = threading.Thread(target=self._process_file_queue, daemon=True)
-            worker.start()
-            self.workers.append(worker)
-        
-        # Start periodic system scan
-        scan_thread = threading.Thread(target=self._periodic_system_scan, daemon=True)
-        scan_thread.start()
-        self.workers.append(scan_thread)
-        
-        # Start process monitoring
-        process_thread = threading.Thread(target=self._monitor_processes, daemon=True)
-        process_thread.start()
-        self.workers.append(process_thread)
-        
-        logger.info("Malware monitoring system started successfully")
-    
-    def stop_monitoring(self):
-        """Stop the monitoring process"""
-        logger.info("Stopping real-time malware monitoring")
-        self.is_running = False
-        
-        # Stop the observer
-        self.observer.stop()
-        self.observer.join()
-        
-        # Wait for workers to finish
-        for worker in self.workers:
-            worker.join(timeout=1.0)
-        
-        logger.info("Malware monitoring system stopped")
-    
-    def _process_file_queue(self):
-        """Worker thread to process files in the queue"""
-        while self.is_running:
-            try:
-                file_path = self.file_queue.get(timeout=1.0)
-                self._analyze_file(file_path)
-                self.file_queue.task_done()
-            except queue.Empty:
-                pass  # Queue is empty, continue waiting
-            except Exception as e:
-                logger.error(f"Error processing file: {e}")
-    
-    def _analyze_file(self, file_path):
-        """Analyze a file for malware"""
-        logger.info(f"Analyzing file: {file_path}")
-        
-        # Skip large files (>50MB) for performance
+        self.monitor_thread = None
+        self.known_pids = set()
+        self.lock = threading.Lock()
+        # OPTIMIZATION: Reduce memory usage by limiting event logging
+        self.max_events_per_session = 1000
+
+    def start(self):
+        """Start the background monitoring thread"""
+        with self.lock:
+            if not self.is_running:
+                self.is_running = True
+                self.known_pids = {p.pid for p in psutil.process_iter()}
+                self.monitor_thread = threading.Thread(target=self._run_monitor, daemon=True)
+                self.monitor_thread.start()
+                logger.info("Real-time Intelligence Monitor started.")
+
+    def stop(self):
+        """Stop the monitoring thread"""
+        with self.lock:
+            self.is_running = False
+            logger.info("Real-time Intelligence Monitor stopped.")
+
+    def _log_event(self, process_name, pid, file_path, event_type, details, threat_level, detected_type):
+        """Save a detected event to the database for the UI to display"""
         try:
-            if os.path.getsize(file_path) > 50 * 1024 * 1024:
-                logger.info(f"Skipping large file: {file_path}")
-                return
-        except OSError:
-            logger.warning(f"Cannot access file: {file_path}")
-            return
+            conn = database.get_connection()
+            conn.execute("""
+                INSERT INTO monitor_events 
+                (process_name, process_pid, file_path, event_type, details, threat_level, detected_type, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (process_name, pid, file_path, event_type, details, threat_level, detected_type, datetime.now().isoformat()))
+            conn.commit()
+            conn.close()
             
-        # Get file hash
-        try:
-            file_hash = self.malware_detector.calculate_file_hash(file_path)
+            # Clear stats cache so UI updates immediately
+            from api_monitor import clear_monitor_stats_cache
+            clear_monitor_stats_cache()
         except Exception as e:
-            logger.error(f"Error calculating hash: {e}")
-            return
-        
-        # First, check with malware type detector
+            logger.error(f"Failed to log monitor event: {e}")
+
+    def _analyze_process(self, proc):
+        """Perform real-time analysis on a process"""
         try:
-            result = self.malware_detector.detect_malware_type(file_path)
-            if result["confidence"] > 0.5:
-                logger.warning(f"Potential {result['detected_type']} detected: {file_path}")
-                self.suspicious_files[file_path] = result
-        except Exception as e:
-            logger.error(f"Error detecting malware type: {e}")
-        
-        # If ML model is available, also check with it
-        if has_ml_model:
-            try:
-                file_extension = os.path.splitext(file_path)[1].lower()
-                if file_extension in ['.exe', '.dll']:
-                    features = extract_features_for_file(file_path)
-                    prediction = model.predict(features)
-                    if prediction[0] == 1:
-                        logger.warning(f"ML model detected malware: {file_path}")
-                        # Update existing or add new entry
-                        if file_path in self.suspicious_files:
-                            self.suspicious_files[file_path]["ml_detection"] = True
-                        else:
-                            self.suspicious_files[file_path] = {
-                                "detected_type": "Unknown (ML Detection)",
-                                "confidence": 0.8,
-                                "file_hash": file_hash,
-                                "ml_detection": True
-                            }
-            except Exception as e:
-                logger.error(f"Error running ML analysis: {e}")
+            with proc.oneshot():
+                pid = proc.pid
+                name = proc.name()
+                exe = proc.exe()
+                cmdline = " ".join(proc.cmdline())
+                
+                # 1. Check if executable is suspicious using MalwareTypeDetector
+                if exe and os.path.exists(exe):
+                    analysis = self.detector.detect_malware_type(exe)
+                    if analysis['detected_type'] != "Unknown" and analysis['confidence'] > 40:
+                        self._log_event(
+                            name, pid, exe, 'process', 
+                            f"Suspicious process execution: {cmdline}",
+                            'High' if analysis['confidence'] > 70 else 'Medium',
+                            analysis['detected_type']
+                        )
+                
+                # 2. Check for suspicious behavior (e.g., process hollowing or unusual parent)
+                # This is a simplified check for demonstration
+                suspicious_names = ['powershell.exe', 'cmd.exe', 'schtasks.exe', 'reg.exe', 'vssadmin.exe']
+                if name.lower() in suspicious_names:
+                    # Check for suspicious flags in command line
+                    suspicious_flags = ['-enc', '-encodedcommand', 'bypass', 'hidden', 'delete shadows']
+                    if any(flag in cmdline.lower() for flag in suspicious_flags):
+                        self._log_event(
+                            name, pid, exe, 'process',
+                            f"Suspicious system utility usage: {cmdline}",
+                            'Critical',
+                            'Trojan/Ransomware'
+                        )
 
-    def _periodic_system_scan(self):
-        """Periodically scan the system for suspicious files"""
+                # 3. Monitor Network connections of the process
+                # OPTIMIZATION: Skip network monitoring to reduce CPU usage
+                # Network monitoring can be expensive and is causing slowdowns
+                # Uncomment if needed for specific analysis
+                """
+                try:
+                    connections = proc.net_connections(kind='inet')
+                    for conn in connections:
+                        if conn.status == 'ESTABLISHED':
+                            remote = f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else "Unknown"
+                            # Log external connections from non-browser processes
+                            browsers = ['chrome.exe', 'firefox.exe', 'msedge.exe', 'brave.exe']
+                            if name.lower() not in browsers:
+                                self._log_event(
+                                    name, pid, exe, 'network',
+                                    f"Active network connection to {remote}",
+                                    'Low',
+                                    'Network Hook'
+                                )
+                except (psutil.AccessDenied, psutil.NoSuchProcess):
+                    pass
+                """
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+
+    def _run_monitor(self):
+        """Main monitor loop"""
         while self.is_running:
-            logger.info("Starting periodic system scan")
-            
-            # Scan specific directories of interest
-            critical_dirs = [
-                os.path.join(os.environ.get('TEMP', 'C:\\Windows\\Temp')),
-                os.path.join(os.environ.get('APPDATA', '')),
-                os.path.join(os.environ.get('LOCALAPPDATA', ''))
-            ]
-            
-            # Add user-specified directories
-            all_dirs = list(set(critical_dirs + self.watch_directories))
-            
-            for directory in all_dirs:
-                if os.path.exists(directory):
-                    for root, _, files in os.walk(directory):
-                        for file in files:
-                            file_path = os.path.join(root, file)
-                            # Only scan executables, scripts, and documents
-                            if file.endswith(('.exe', '.dll', '.js', '.vbs', '.ps1', '.bat', '.docm', '.xlsm')):
-                                self.file_queue.put(file_path)
-            
-            # Sleep until next scan
-            time.sleep(self.scan_interval)
-    
-    def _monitor_processes(self):
-        """Monitor running processes for suspicious activity"""
-        while self.is_running:
             try:
-                current_processes = set()
+                for proc in psutil.process_iter(['pid', 'name']):
+                    pid = proc.info['pid']
+                    if pid not in self.known_pids:
+                        self._analyze_process(proc)
+                        self.known_pids.add(pid)
                 
-                # Get all running processes
-                for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
-                    try:
-                        process_info = proc.info
-                        pid = process_info['pid']
-                        exe_path = process_info.get('exe', '')
-                        
-                        current_processes.add(pid)
-                        
-                        # Check new processes only
-                        if pid not in self.known_processes and exe_path:
-                            # Analyze the executable file
-                            if os.path.exists(exe_path):
-                                self.file_queue.put(exe_path)
-                                
-                            # Additional checks for suspicious process behavior
-                            try:
-                                # Check for high CPU or memory usage
-                                with proc.oneshot():
-                                    cpu_percent = proc.cpu_percent(interval=0.1)
-                                    memory_percent = proc.memory_percent()
-                                    
-                                    if cpu_percent > 80 or memory_percent > 50:
-                                        process_name = process_info.get('name', 'Unknown')
-                                        logger.warning(f"Suspicious resource usage by process: {process_name} (PID: {pid})")
-                                        
-                                        self.suspicious_processes[pid] = {
-                                            'name': process_name,
-                                            'exe': exe_path,
-                                            'cpu': cpu_percent,
-                                            'memory': memory_percent
-                                        }
-                            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                                pass
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        pass
+                # Clean up finished processes from known_pids to save memory
+                active_pids = {p.pid for p in psutil.process_iter()}
+                self.known_pids &= active_pids
                 
-                # Update known processes
-                self.known_processes = current_processes
-                
-                # Sleep for a short time
-                time.sleep(5)
+                # OPTIMIZATION: Increased polling interval from 5s to 15s for local dev environment
+                # Background monitoring is heavy and shouldn't impact UI responsiveness
+                time.sleep(15)
             except Exception as e:
-                logger.error(f"Error monitoring processes: {e}")
-                time.sleep(10)  # Wait longer if there's an error
-    
-    def get_status_report(self):
-        """Generate a status report of detected threats"""
-        return {
-            'suspicious_files': self.suspicious_files,
-            'suspicious_processes': self.suspicious_processes,
-            'monitored_directories': self.watch_directories,
-            'is_running': self.is_running
-        }
+                logger.error(f"Error in monitor loop: {e}")
+                time.sleep(15)
 
-
-class FileCreatedHandler(FileSystemEventHandler):
-    """Watches for file creation events and adds them to the queue"""
-    def __init__(self, file_queue):
-        self.file_queue = file_queue
-    
-    def on_created(self, event):
-        if not event.is_directory:
-            self.file_queue.put(event.src_path)
-    
-    def on_modified(self, event):
-        if not event.is_directory:
-            self.file_queue.put(event.src_path)
-
-
-# Sample usage
-if __name__ == "__main__":
-    # Example of how to use the monitor
-    watch_dirs = [
-        os.path.join(os.path.expanduser('~'), 'Downloads'), 
-        os.path.join(os.path.expanduser('~'), 'Documents')
-    ]
-    
-    monitor = MalwareMonitor(watch_directories=watch_dirs)
-    monitor.start_monitoring()
-    
-    try:
-        # Keep the main thread alive
-        while True:
-            time.sleep(10)
-            status = monitor.get_status_report()
-            print(f"Monitoring {len(status['monitored_directories'])} directories")
-            print(f"Suspicious files detected: {len(status['suspicious_files'])}")
-            print(f"Suspicious processes detected: {len(status['suspicious_processes'])}")
-    except KeyboardInterrupt:
-        monitor.stop_monitoring()
-        print("Monitoring stopped") 
+# Global instance
+monitor_instance = RealTimeMonitor()

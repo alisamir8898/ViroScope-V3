@@ -69,7 +69,8 @@ class DynamicAnalyzer:
         execution_info = self._execute_sample(file_path)
         
         # Get post-execution state
-        time.sleep(2)  # Wait for any delayed actions
+        # Reduced wait time for local development
+        time.sleep(0.5)
         final_processes = self._get_running_processes()
         final_files = self._get_directory_state()
         
@@ -77,8 +78,12 @@ class DynamicAnalyzer:
         created_processes = self._compare_processes(initial_processes, final_processes)
         file_changes = self._compare_files(initial_files, final_files)
         
-        # Get network connections
-        network_activity = self._get_network_activity(execution_info.get('pid'))
+        # Get network connections (combine live and post-execution)
+        network_activity = self.live_network_activity if hasattr(self, 'live_network_activity') else []
+        post_net = self._get_network_activity(execution_info.get('pid'))
+        for pn in post_net:
+            if pn not in network_activity:
+                network_activity.append(pn)
         
         # Compile behavioral indicators
         behavioral_indicators = self._analyze_behavior(execution_info, created_processes, 
@@ -159,41 +164,58 @@ class DynamicAnalyzer:
                     execution_info["terminated"] = True
                     break
                 
-                # التقاط الاتصالات الشبكية للعملية وهي حية في الذاكرة
-                try:
-                    p = psutil.Process(process.pid)
-                    # رصد اتصالات العملية الحالية
-                    for conn in p.connections(kind='inet'):
-                        if conn.status in ['ESTABLISHED', 'SYN_SENT']:
-                            self.live_network_activity.append({
-                                'pid': process.pid,
-                                'local_address': f"{conn.laddr.ip}:{conn.laddr.port}",
-                                'remote_address': f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else None,
-                                'status': conn.status
-                            })
-                    
-                    # رصد اتصالات العمليات الفرعية إن وجدت
-                    for child in p.children(recursive=True):
-                        for conn in child.connections(kind='inet'):
-                            if conn.status in ['ESTABLISHED', 'SYN_SENT']:
-                                self.live_network_activity.append({
-                                    'pid': child.pid,
-                                    'local_address': f"{conn.laddr.ip}:{conn.laddr.port}",
-                                    'remote_address': f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else None,
-                                    'status': conn.status
-                                })
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
+                # OPTIMIZATION: Reduced network monitoring frequency to every 5th iteration
+                # This significantly reduces CPU overhead while still capturing network activity
+                if int(time.time() * 10) % 5 == 0:  # Sample every 5 iterations (~2.5s)
+                    try:
+                        p = psutil.Process(process.pid)
+                        # رصد اتصالات العملية الحالية
+                        try:
+                            conns = p.net_connections(kind='inet') if hasattr(p, 'net_connections') else p.connections(kind='inet')
+                            for conn in conns:
+                                if conn.status in ['ESTABLISHED', 'SYN_SENT']:
+                                    self.live_network_activity.append({
+                                        'pid': process.pid,
+                                        'local_address': f"{conn.laddr.ip}:{conn.laddr.port}",
+                                        'remote_address': f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else None,
+                                        'status': conn.status
+                                    })
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            pass
+                        
+                        # رصد اتصالات العمليات الفرعية إن وجدت
+                        for child in p.children(recursive=True):
+                            try:
+                                child_conns = child.net_connections(kind='inet') if hasattr(child, 'net_connections') else child.connections(kind='inet')
+                                for conn in child_conns:
+                                    if conn.status in ['ESTABLISHED', 'SYN_SENT']:
+                                        self.live_network_activity.append({
+                                            'pid': child.pid,
+                                            'local_address': f"{conn.laddr.ip}:{conn.laddr.port}",
+                                            'remote_address': f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else None,
+                                            'status': conn.status
+                                        })
+                            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                                pass
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
                 
-                time.sleep(0.1) # الفحص كل 100 مللي ثانية
+                # OPTIMIZATION: Increased polling interval from 0.1s to 0.5s to reduce CPU usage
+                # This still captures network activity but with less overhead
+                time.sleep(0.5)
             
             # 4. بعد انتهاء العملية نقرأ الـ Output المتبقي
             stdout, stderr = process.communicate()
             execution_info["stdout"] = stdout.decode('utf-8', errors='ignore')
             execution_info["stderr"] = stderr.decode('utf-8', errors='ignore')
             execution_info["exit_code"] = process.returncode
+            
+            # Signal monitor thread to stop
+            self.monitor_queue.put(None)
                 
         except Exception as e:
+            # Signal monitor thread to stop even on error
+            self.monitor_queue.put(None)
             logger.error(f"Error executing file: {e}")
             execution_info["error"] = str(e)
             
@@ -205,16 +227,19 @@ class DynamicAnalyzer:
         monitored_pids = set()
         pid_to_children = {}
         
+        # Stop monitoring when the main analysis loop finishes (signaled by None in queue)
         while True:
             try:
                 # Get new PIDs from queue
                 while not self.monitor_queue.empty():
                     new_pid = self.monitor_queue.get()
+                    if new_pid is None: # Signal to stop
+                        return
                     monitored_pids.add(new_pid)
                     pid_to_children[new_pid] = []
                 
                 if not monitored_pids:
-                    time.sleep(0.1)
+                    time.sleep(0.5)
                     continue
                 
                 # Check each monitored process
@@ -357,7 +382,7 @@ class DynamicAnalyzer:
                 return connections
                 
             process = psutil.Process(pid)
-            process_connections = process.connections()
+            process_connections = process.net_connections() if hasattr(process, 'net_connections') else process.connections()
             
             for conn in process_connections:
                 if conn.status == 'ESTABLISHED':

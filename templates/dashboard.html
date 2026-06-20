@@ -6,7 +6,7 @@
         <h1>Command Center</h1>
         <div class="subtitle">Global intelligence overview and recent operations</div>
     </div>
-    <a href="{{ url_for('scan') }}" class="btn btn-primary">Deploy New Scan</a>
+    <a href="{{ url_for('scan') }}" class="btn btn-primary"><i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 6px;"></i> Deploy New Scan</a>
 </div>
 
 <div class="content">
@@ -33,7 +33,7 @@
     <div class="panel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
             <span class="section-title">Dynamic Operations Monitor</span>
-            <a href="{{ url_for('dynamic_analysis') }}" class="btn btn-sm btn-secondary">View Ops Log →</a>
+            <a href="{{ url_for('dynamic_analysis') }}" class="btn btn-sm btn-secondary">View Operation Log →</a>
         </div>
         
         <div class="grid-stats" style="margin-bottom: 0;">
@@ -47,7 +47,7 @@
             </div>
             <div class="stat-card accent-amber">
                 <div class="stat-value">{{ dynamic_stats.high }}</div>
-                <div class="stat-label">High Risk Ops</div>
+                <div class="stat-label">High Risk Operations</div>
             </div>
             <div class="stat-card accent-green">
                 <div class="stat-value">{{ dynamic_stats.low }}</div>

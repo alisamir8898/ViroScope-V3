@@ -11,22 +11,29 @@
 <div class="content">
     <form method="POST" enctype="multipart/form-data" id="scan-form">
         <div class="panel">
-            <span class="eyebrow">Source Selection</span>
-            <span class="section-title">Upload Target Executable</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <span class="eyebrow">Source Selection</span>
+                    <span class="section-title">Upload Target Executable</span>
+                </div>
+                <a href="{{ url_for('monitor') }}" class="btn btn-sm btn-secondary" target="_blank">
+                    <i data-lucide="activity" style="width: 14px; height: 14px; margin-right: 6px;"></i> Open Live Monitor
+                </a>
+            </div>
 
             <div class="dropzone" id="dropzone">
                 <div id="dz-initial">
-                    <div class="dz-icon">⌖</div>
+                    <div class="dz-icon"><i data-lucide="upload-cloud"></i></div>
                     <div class="dz-text">Drag target here or click to select</div>
                     <div class="dz-hint">Supported: .exe, .dll, .sys, .scr, .ocx (Max 64MB)</div>
                 </div>
                 
                 <div id="dz-selected" style="display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center;">
-                    <div class="dz-icon" style="color: var(--signal-cyan);">✓</div>
+                    <div class="dz-icon" style="color: var(--signal-cyan);"><i data-lucide="check-circle-2"></i></div>
                     <div id="selected-filename" style="font-weight: 700; color: #fff; font-size: 18px; margin-bottom: 8px; font-family: var(--font-mono);"></div>
                     <div id="selected-filesize" style="color: var(--text-tertiary); font-size: 14px; margin-bottom: 20px;"></div>
                     <button type="button" id="change-file-btn" class="btn btn-sm btn-secondary" style="border-radius: 20px; padding: 6px 20px;">
-                        ↺ Change File
+                        <i data-lucide="refresh-cw" style="width: 14px; height: 14px; margin-right: 6px;"></i> Change File
                     </button>
                 </div>
                 
@@ -44,7 +51,7 @@
                     <div class="text-tertiary" style="font-size:12px;">Query global reputation database for known signatures</div>
                 </div>
                 <label class="toggle">
-                    <input type="checkbox" name="check_vt" value="1" {{ 'checked' if vt_enabled else 'disabled' }}>
+                    <input type="checkbox" name="check_vt" value="1" {{ 'disabled' if not vt_enabled }}>
                     <span class="slider"></span>
                 </label>
             </div>
@@ -55,14 +62,14 @@
                     <div class="text-tertiary" style="font-size:12px;">Monitor real-time execution, network hooks, and process spawning</div>
                 </div>
                 <label class="toggle">
-                    <input type="checkbox" name="run_dynamic" value="1" checked>
+                    <input type="checkbox" name="run_dynamic" value="1">
                     <span class="slider"></span>
                 </label>
             </div>
         </div>
 
         <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
-            Deploy Analysis Engine
+            <i data-lucide="zap" style="width: 18px; height: 18px;"></i> Deploy Analysis Engine
         </button>
     </form>
 </div>
@@ -122,29 +129,21 @@ dropzone.addEventListener('drop', e => {
     }
 });
 
-form.addEventListener('submit', (e) => {
-    if (fileInput.files.length === 0) {
-        e.preventDefault();
-        Swal.fire({
-            title: 'No File Selected',
-            text: 'Please select a target executable first.',
-            icon: 'error',
-            background: '#0d1117',
-            color: '#f0f6fc'
-        });
-        return;
-    }
-    
-    Swal.fire({
-        title: 'Initializing Analysis',
-        html: 'Deploying research modules and monitoring hooks...',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        },
-        background: '#0d1117',
-        color: '#f0f6fc'
+    form.addEventListener('submit', (e) => {
+        if (fileInput.files.length === 0) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'No File Selected',
+                text: 'Please select a target executable first.',
+                icon: 'error',
+                background: '#0d1117',
+                color: '#f0f6fc'
+            });
+            return;
+        }
+        
+        // Use the professional global loader
+        showLoader("Malware Analysis Powered By Ai");
     });
-});
 </script>
 {% endblock %}

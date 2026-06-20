@@ -16,17 +16,17 @@
 
             <div class="dropzone" id="dropzone" style="height: 250px;">
                 <div id="dz-initial">
-                    <div class="dz-icon">▤</div>
+                    <div class="dz-icon"><i data-lucide="layers"></i></div>
                     <div class="dz-text">Drag multiple targets here or click to select</div>
                     <div class="dz-hint">Select multiple .exe, .dll, or .sys files (Max 64MB total)</div>
                 </div>
                 
                 <div id="dz-selected" style="display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
-                    <div class="dz-icon" style="color: var(--signal-cyan);">✓</div>
+                    <div class="dz-icon" style="color: var(--signal-cyan);"><i data-lucide="check-square"></i></div>
                     <div id="selected-count" style="font-weight: 700; color: #fff; font-size: 20px; margin-bottom: 4px; font-family: var(--font-mono);"></div>
                     <div id="file-list-preview" style="color: var(--text-tertiary); font-size: 13px; margin-bottom: 20px; text-align: center; max-width: 80%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
                     <button type="button" id="change-files-btn" class="btn btn-sm btn-secondary" style="border-radius: 20px; padding: 6px 20px;">
-                        ↺ Change Selection
+                        <i data-lucide="refresh-cw" style="width: 14px; height: 14px; margin-right: 6px;"></i> Change Selection
                     </button>
                 </div>
                 
@@ -44,7 +44,7 @@
                     <div class="text-tertiary" style="font-size:12px;">Query global reputation database for all selected hashes</div>
                 </div>
                 <label class="toggle">
-                    <input type="checkbox" name="check_vt" value="1" {{ 'checked' if vt_enabled else 'disabled' }}>
+                    <input type="checkbox" name="check_vt" value="1" {{ 'disabled' if not vt_enabled }}>
                     <span class="slider"></span>
                 </label>
             </div>
@@ -57,7 +57,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
-            Deploy Bulk Analysis
+            <i data-lucide="zap" style="width: 18px; height: 18px;"></i> Deploy Bulk Analysis
         </button>
     </form>
 </div>
@@ -113,29 +113,21 @@ dropzone.addEventListener('drop', e => {
     }
 });
 
-form.addEventListener('submit', (e) => {
-    if (fileInput.files.length === 0) {
-        e.preventDefault();
-        Swal.fire({
-            title: 'Selection Empty',
-            text: 'Please select at least one target asset.',
-            icon: 'error',
-            background: '#0d1117',
-            color: '#f0f6fc'
-        });
-        return;
-    }
-    
-    Swal.fire({
-        title: 'Processing Batch',
-        html: `Analyzing ${fileInput.files.length} assets...<br><small style="color: var(--text-tertiary)">This may take a few moments</small>`,
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        },
-        background: '#0d1117',
-        color: '#f0f6fc'
+    form.addEventListener('submit', (e) => {
+        if (fileInput.files.length === 0) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Selection Empty',
+                text: 'Please select at least one target asset.',
+                icon: 'error',
+                background: '#0d1117',
+                color: '#f0f6fc'
+            });
+            return;
+        }
+        
+        // Use the professional global loader
+        showLoader(`Analyzing ${fileInput.files.length} Assets...`);
     });
-});
 </script>
 {% endblock %}

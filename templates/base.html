@@ -7,11 +7,28 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     {% block extra_head %}{% endblock %}
 </head>
 <body dir="ltr">
+    <!-- Professional Loading Screen (Only on page refresh, not on section navigation) -->
+    <div id="global-loader" class="loading-overlay">
+        <div class="loader-content">
+            <div class="loader-logo">
+                <div class="dot"></div>
+                VIROSCOPE
+            </div>
+            <div id="loader-text" class="loader-text">Malware Analysis Powered By Ai</div>
+            <div class="loader-bar-container">
+                <div class="loader-bar"></div>
+            </div>
+            <div class="loader-subtext">Initializing Secure Environment...</div>
+        </div>
+    </div>
+
     <div class="app-shell">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-brand">
@@ -20,20 +37,22 @@
             </div>
             <nav class="sidebar-nav">
                 <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">
-                    <span class="icon">▣</span> Overview
+                    <i data-lucide="layout-dashboard" class="nav-icon"></i> Command Center
                 </a>
                 <a href="{{ url_for('scan') }}" class="{{ 'active' if request.endpoint == 'scan' }}">
-                    <span class="icon">▶</span> Single Scan
+                    <i data-lucide="scan" class="nav-icon"></i> Engine Scan
                 </a>
                 <a href="{{ url_for('batch') }}" class="{{ 'active' if request.endpoint == 'batch' }}">
-                    <span class="icon">▤</span> Batch Analysis
+                    <i data-lucide="layers" class="nav-icon"></i> Bulk Analysis
+                </a>
+                <a href="{{ url_for('monitor') }}" class="{{ 'active' if request.endpoint == 'monitor' }}">
+                    <i data-lucide="activity" class="nav-icon"></i> Dynamic Monitor
                 </a>
                 <a href="{{ url_for('history') }}" class="{{ 'active' if request.endpoint in ['history', 'history_detail'] }}">
-                    <span class="icon">▥</span> History
+                    <i data-lucide="history" class="nav-icon"></i> Research History
                 </a>
                 <a href="{{ url_for('dynamic_analysis') }}" class="{{ 'active' if request.endpoint in ['dynamic_analysis', 'dynamic_detail', 'live_captures'] }}">
-                    <span class="icon">▤
-</span> Dynamic Scanner
+                    <i data-lucide="cpu" class="nav-icon"></i> Dynamic Operations
                 </a>
             </nav>
             <div class="sidebar-status">
@@ -57,6 +76,67 @@
     </div>
 
     <script>
+        // ============================================================================
+        // LOADING SCREEN LOGIC - Only show on page refresh, not on section navigation
+        // ============================================================================
+        
+        // Check if this is the first load (page refresh) or a section switch
+        function initializeLoadingScreen() {
+            const loader = document.getElementById('global-loader');
+            const isFirstLoad = !sessionStorage.getItem('viroscope_initialized');
+            
+            if (isFirstLoad) {
+                // First load - show the loader
+                sessionStorage.setItem('viroscope_initialized', 'true');
+                // Loader is already visible in HTML
+            } else {
+                // Section navigation - hide the loader immediately
+                loader.classList.add('hidden');
+            }
+        }
+        
+        // Initialize on DOM content loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeLoadingScreen();
+            
+            // Initialize Lucide icons
+            lucide.createIcons();
+        });
+        
+        // Hide loader when page fully loads (only on first load)
+        window.addEventListener('load', () => {
+            const loader = document.getElementById('global-loader');
+            if (!loader.classList.contains('hidden')) {
+                setTimeout(() => {
+                    loader.classList.add('hidden');
+                }, 800); // Small delay for effect
+            }
+        });
+        
+        // Prevent loader from showing on section navigation
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('a');
+            if (link && link.href && !link.target && !link.hasAttribute('download')) {
+                // Check if it's an internal navigation link
+                const currentHost = window.location.hostname;
+                const linkHost = new URL(link.href, window.location.origin).hostname;
+                
+                if (currentHost === linkHost) {
+                    // Internal navigation - ensure loader is hidden
+                    const loader = document.getElementById('global-loader');
+                    loader.classList.add('hidden');
+                }
+            }
+        });
+        
+        // Function to show loader on form submissions (if needed for long operations)
+        function showLoader(text = "Malware Analysis Powered By Ai") {
+            const loader = document.getElementById('global-loader');
+            const loaderText = document.getElementById('loader-text');
+            loaderText.textContent = text;
+            loader.classList.remove('hidden');
+        }
+
         // SweetAlert helper for Flask Flash Messages
         document.addEventListener('DOMContentLoaded', () => {
             {% with messages = get_flashed_messages(with_categories=true) %}

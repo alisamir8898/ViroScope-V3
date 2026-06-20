@@ -7,8 +7,8 @@
         <div class="subtitle">Real-time behavioral research and live event capture logs</div>
     </div>
     <div style="display: flex; gap: 12px;">
-        <button onclick="location.reload()" class="btn btn-sm btn-secondary">Refresh Feed</button>
-        <button onclick="clearDynamicHistory()" class="btn btn-sm btn-danger">Purge Ops Data</button>
+        <button onclick="location.reload()" class="btn btn-sm btn-secondary"><i data-lucide="refresh-cw" style="width: 14px; height: 14px; margin-right: 6px;"></i> Refresh Feed</button>
+        <button onclick="clearDynamicHistory()" class="btn btn-sm btn-danger"><i data-lucide="trash-2" style="width: 14px; height: 14px; margin-right: 6px;"></i> Delete Data</button>
     </div>
 </div>
 
@@ -49,8 +49,8 @@
                 <input type="text" name="search" placeholder="Target name or hash..." value="{{ request.args.get('search', '') }}" 
                        style="width: 100%; background: var(--bg-panel-2); border: 1px solid var(--line); color: #fff; padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 13px;">
             </div>
-            <button type="submit" class="btn btn-primary btn-sm">Filter Ops</button>
-            <a href="{{ url_for('dynamic_analysis') }}" class="btn btn-secondary btn-sm">Reset</a>
+            <button type="submit" class="btn btn-primary btn-sm"><i data-lucide="filter" style="width: 14px; height: 14px; margin-right: 6px;"></i> Filter Operations</button>
+            <a href="{{ url_for('dynamic_analysis') }}" class="btn btn-secondary btn-sm"><i data-lucide="rotate-ccw" style="width: 14px; height: 14px; margin-right: 6px;"></i> Reset</a>
         </form>
 
         {% if sessions %}
@@ -113,11 +113,11 @@
 <script>
 function clearDynamicHistory() {
     Swal.fire({
-        title: 'Purge Operation Data?',
+        title: 'DeleteOperation Data?',
         text: "This will permanently delete all behavioral logs and session intelligence.",
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Yes, Purge Data',
+        confirmButtonText: 'Yes, DeleteData',
         cancelButtonText: 'Abort',
         background: '#0d1117',
         color: '#f0f6fc',
@@ -130,7 +130,7 @@ function clearDynamicHistory() {
             .then(data => {
                 if(data.success) {
                     Swal.fire({
-                        title: 'Purged',
+                        title: 'Deleted',
                         text: 'Intelligence database cleared.',
                         icon: 'success',
                         background: '#0d1117',

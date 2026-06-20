@@ -30,6 +30,9 @@ import database
 from predictor import predict_file, model_is_ready, load_model
 from vt_scanner import VirusTotalScanner
 from dynamic_analysis_manager import get_manager as get_analysis_manager
+from realtime_monitor import monitor_instance
+from api_monitor import get_monitor_events, get_monitor_stats, clear_monitor_stats_cache
+from performance_config import apply_performance_config, optimize_database
 
 load_dotenv()
 
@@ -41,7 +44,7 @@ MAX_CONTENT_LENGTH = 64 * 1024 * 1024  # 64 MB per file
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,  # Reduced from INFO to WARNING for better performance
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.FileHandler(os.path.join(BASE_DIR, "viroscope.log")), logging.StreamHandler()],
 )
@@ -51,9 +54,13 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-key-change-me")
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
+# Apply performance optimizations
+apply_performance_config(app)
+
 vt_scanner = VirusTotalScanner()
 
 database.init_db()
+optimize_database()  # Optimize SQLite for performance
 load_model()  # warm the model cache at startup so the first request isn't slow
 
 
@@ -148,8 +155,10 @@ def scan():
         return redirect(url_for("scan"))
 
     saved_path, original_name = save_upload(file)
-    check_vt = request.form.get("check_vt", "1") == "1"
-    run_dynamic = request.form.get("run_dynamic", "0") == "1"
+    # Use get(key) and check if it's exactly '1' (value of checked checkbox)
+    # Checkboxes only send their value if they are checked
+    check_vt = request.form.get("check_vt") == "1"
+    run_dynamic = request.form.get("run_dynamic") == "1"
 
     try:
         result = run_full_analysis(saved_path, original_name, check_vt=check_vt, run_dynamic=run_dynamic)
@@ -310,6 +319,60 @@ def dynamic_detail(session_id):
     return render_template("dynamic_detail.html", session=details['session'])
 
 
+@app.route("/monitor")
+def monitor():
+    """Real-time monitoring logs page"""
+    threat_filter = request.args.get("threat_level", "all")
+    event_type = request.args.get("event_type", "all")
+    search = request.args.get("search", "").strip() or None
+    
+    conn = database.get_connection()
+    query = "SELECT * FROM monitor_events WHERE 1=1"
+    params = []
+    
+    if threat_filter != "all":
+        query += " AND threat_level = ?"
+        params.append(threat_filter)
+    
+    if search:
+        query += " AND (process_name LIKE ? OR file_path LIKE ? OR details LIKE ?)"
+        params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
+        
+    query += " ORDER BY created_at DESC LIMIT 500"
+    
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    
+    return render_template("monitor.html", events=[dict(r) for r in rows], threat_filter=threat_filter, search=search or "")
+
+@app.route("/api/monitor/events", methods=["GET"])
+def api_monitor_events():
+    """Fetch monitor events with optional filtering - optimized for real-time updates"""
+    limit = min(int(request.args.get("limit", 50)), 200)
+    offset = int(request.args.get("offset", 0))
+    threat_level = request.args.get("threat_level", "all")
+    event_type = request.args.get("event_type", "all")
+    search = request.args.get("search", "").strip() or None
+    
+    result = get_monitor_events(limit=limit, offset=offset, threat_level=threat_level, 
+                               event_type=event_type, search=search)
+    return jsonify(result)
+
+@app.route("/api/monitor/stats", methods=["GET"])
+def api_monitor_stats():
+    """Get cached monitor statistics - fast endpoint for real-time dashboard"""
+    stats = get_monitor_stats()
+    return jsonify(stats)
+
+@app.route("/api/monitor/clear", methods=["POST"])
+def api_clear_monitor():
+    conn = database.get_connection()
+    conn.execute("DELETE FROM monitor_events")
+    conn.commit()
+    conn.close()
+    clear_monitor_stats_cache()
+    return jsonify({"success": True})
+
 @app.route("/live_captures/<int:session_id>")
 def live_captures(session_id):
     """Live capture events for a session"""
@@ -377,4 +440,18 @@ if __name__ == "__main__":
     print("  ViroScope — Malware Triage Console")
     print("  Running locally at http://127.0.0.1:5000")
     print("=" * 60)
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    
+    # Start the real-time intelligence monitor in the background
+    monitor_instance.start()
+    try:
+        # OPTIMIZATION: Disable auto-reloader and watchdog to prevent constant restarts
+        # This significantly improves performance when running in development mode
+        app.run(
+            host="127.0.0.1", 
+            port=5000, 
+            debug=False,  # Changed from True to False
+            use_reloader=False,  # Disable auto-reloader
+            threaded=True  # Ensure threaded mode for better responsiveness
+        )
+    finally:
+        monitor_instance.stop()

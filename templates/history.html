@@ -7,7 +7,7 @@
         <div class="subtitle">Comprehensive database of all analyzed target assets</div>
     </div>
     <div style="display: flex; gap: 12px;">
-        <button onclick="purgeHistory()" class="btn btn-sm btn-danger">Purge Intelligence</button>
+        <button onclick="purgeHistory()" class="btn btn-sm btn-danger"><i data-lucide="trash-2" style="width: 14px; height: 14px; margin-right: 6px;"></i> Delete Intelligence</button>
     </div>
 </div>
 
@@ -27,8 +27,8 @@
                 <input type="text" name="q" placeholder="Asset name or hash..." value="{{ search }}" 
                        style="width: 100%; background: var(--bg-panel-2); border: 1px solid var(--line); color: #fff; padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 13px;">
             </div>
-            <button type="submit" class="btn btn-primary btn-sm">Query Database</button>
-            <a href="{{ url_for('history') }}" class="btn btn-secondary btn-sm">Reset</a>
+            <button type="submit" class="btn btn-primary btn-sm"><i data-lucide="search" style="width: 14px; height: 14px; margin-right: 6px;"></i> Query Database</button>
+            <a href="{{ url_for('history') }}" class="btn btn-secondary btn-sm"><i data-lucide="rotate-ccw" style="width: 14px; height: 14px; margin-right: 6px;"></i> Reset</a>
         </form>
 
         {% if records %}
@@ -63,7 +63,7 @@
                     <td class="mono text-tertiary" style="font-size: 11px;">{{ r.created_at[:19].replace('T', ' ') }}</td>
                     <td>
                         <form action="{{ url_for('api_delete_scan', scan_id=r.id) }}" method="POST" style="display:inline;" onclick="event.stopPropagation();">
-                            <button type="button" onclick="confirmDelete(this.form)" class="btn btn-sm btn-danger" style="padding: 4px 8px; font-size: 10px;">Delete</button>
+                            <button type="button" onclick="confirmDelete(this.form)" class="btn btn-sm btn-danger" style="padding: 4px 8px; font-size: 10px;"><i data-lucide="trash-2" style="width: 12px; height: 12px;"></i></button>
                         </form>
                     </td>
                 </tr>
@@ -97,11 +97,11 @@ function confirmDelete(form) {
 
 function purgeHistory() {
     Swal.fire({
-        title: 'Purge Intelligence Log?',
+        title: 'DeleteIntelligence Log?',
         text: "This will permanently delete all scan records and analysis history.",
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Yes, Purge All',
+        confirmButtonText: 'Yes, DeleteAll',
         background: '#0d1117',
         color: '#f0f6fc',
         confirmButtonColor: '#ff4444'

@@ -62,7 +62,7 @@ class DynamicAnalysisManager:
             execution_time = analysis_result.get('execution_info', {}).get('execution_time', 0)
             exit_code = analysis_result.get('execution_info', {}).get('exit_code')
             risk_score = analysis_result.get('risk_score', {}).get('score', 0) / 100.0
-            malware_type = analysis_result.get('malware_type_indicators', {}).get('detected_type', 'Unknown')
+            malware_type = analysis_result.get('malware_type_indicators', {}).get('likely_type', 'Unknown')
             
             # Save to database
             session_id = database.save_dynamic_session(
@@ -106,6 +106,7 @@ class DynamicAnalysisManager:
     
     def _save_live_captures(self, session_id, analysis_result):
         """Save live capture events from analysis results"""
+        from realtime_monitor import monitor_instance
         
         # Network activity events
         for net_activity in analysis_result.get('network_activity', []):
@@ -120,6 +121,16 @@ class DynamicAnalysisManager:
                 target_resource=net_activity.get('remote_address', 'Unknown'),
                 event_data=net_activity,
                 timestamp=time.time()
+            )
+            # Log to global monitor for real-time visibility
+            monitor_instance._log_event(
+                process_name=f"Scan Session {session_id}",
+                pid=net_activity.get('pid'),
+                file_path=analysis_result.get('file_path', 'Dynamic Analysis'),
+                event_type='network',
+                details=f"Network Connection: {net_activity.get('remote_address')}",
+                threat_level=severity.capitalize(),
+                detected_type='Network Hook'
             )
         
         # File changes events
@@ -137,6 +148,16 @@ class DynamicAnalysisManager:
                 target_resource=created_file,
                 event_data={'action': 'created', 'path': created_file},
                 timestamp=time.time()
+            )
+            # Log to global monitor
+            monitor_instance._log_event(
+                process_name=f"Scan Session {session_id}",
+                pid=analysis_result.get('execution_info', {}).get('pid'),
+                file_path=created_file,
+                event_type='file_system',
+                details=f"File Created: {created_file}",
+                threat_level='Medium',
+                detected_type='File Dropper'
             )
         
         # Modified files
@@ -180,6 +201,16 @@ class DynamicAnalysisManager:
                 target_resource=process.get('exe', 'Unknown'),
                 event_data=process,
                 timestamp=time.time()
+            )
+            # Log to global monitor
+            monitor_instance._log_event(
+                process_name=process.get('name', 'Unknown'),
+                pid=process.get('pid'),
+                file_path=process.get('exe', 'Unknown'),
+                event_type='process',
+                details=f"New Process Spawned during scan",
+                threat_level='High',
+                detected_type='Process Injection'
             )
     
     def _determine_severity(self, network_activity):

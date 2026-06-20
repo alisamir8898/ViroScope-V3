@@ -7,8 +7,8 @@
         <div class="subtitle">{{ result.file_name }}</div>
     </div>
     <div style="display: flex; gap: 12px;">
-        {% if result.dynamic and result.dynamic.id %}
-        <a href="{{ url_for('dynamic_detail', session_id=result.dynamic.id) }}" class="btn btn-primary" style="background-color: #00ff88; color: #000; border-color: #00ff88;">
+        {% if result.dynamic and result.dynamic.session_id %}
+        <a href="{{ url_for('dynamic_detail', session_id=result.dynamic.session_id) }}" class="btn btn-primary" style="background-color: #00ff88; color: #000; border-color: #00ff88;">
             📊 View Dynamic Analysis
         </a>
         {% endif %}
@@ -42,14 +42,14 @@
         </div>
     </div>
 
-    {% if result.dynamic and result.dynamic.id %}
+    {% if result.dynamic and result.dynamic.session_id %}
     <div class="panel" style="border: 1px solid rgba(0,255,136,0.3); background: rgba(0,255,136,0.02);">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
                 <span class="section-title" style="color: #00ff88; margin-bottom: 4px;">Dynamic Analysis Completed</span>
                 <p class="text-secondary" style="font-size: 13px;">Real-time behavioral monitoring and network capture data is available for this file.</p>
             </div>
-            <a href="{{ url_for('dynamic_detail', session_id=result.dynamic.id) }}" class="btn btn-primary" style="background-color: #00ff88; color: #000; border-color: #00ff88; padding: 8px 16px;">
+            <a href="{{ url_for('dynamic_detail', session_id=result.dynamic.session_id) }}" class="btn btn-primary" style="background-color: #00ff88; color: #000; border-color: #00ff88; padding: 8px 16px;">
                 View Details
             </a>
         </div>

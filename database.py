@@ -1,23 +1,57 @@
 """
-database.py
+database.py (OPTIMIZED)
 -----------
-Minimal SQLite persistence layer for scan history. No ORM needed for this
-scope, just a small set of focused helper functions.
+Minimal SQLite persistence layer for scan history with performance optimizations.
+Includes connection pooling, query optimization, and caching.
 """
 
 import os
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from threading import Lock
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instance", "viroscope.db")
 
+# ============ Connection Pooling ============
+_connection_pool = []
+_pool_lock = Lock()
+MAX_POOL_SIZE = 5
 
 def get_connection():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    """Get a connection from the pool or create a new one"""
+    global _connection_pool
+    
+    with _pool_lock:
+        if _connection_pool:
+            conn = _connection_pool.pop()
+        else:
+            os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+            conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=10)
+            conn.row_factory = sqlite3.Row
+    
     return conn
+
+def return_connection(conn):
+    """Return a connection to the pool"""
+    global _connection_pool
+    
+    with _pool_lock:
+        if len(_connection_pool) < MAX_POOL_SIZE:
+            _connection_pool.append(conn)
+        else:
+            conn.close()
+
+# ============ Caching ============
+_stats_cache = None
+_stats_cache_time = None
+STATS_CACHE_TTL = 5  # Cache for 5 seconds
+
+def invalidate_stats_cache():
+    """Invalidate stats cache when data changes"""
+    global _stats_cache, _stats_cache_time
+    _stats_cache = None
+    _stats_cache_time = None
 
 
 def init_db():
@@ -43,6 +77,7 @@ def init_db():
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_created_at ON scans(created_at)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_batch_id ON scans(batch_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_verdict ON scans(verdict)")
     
     # Dynamic Analysis Sessions Table
     conn.execute("""
@@ -69,6 +104,7 @@ def init_db():
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_dynamic_sessions_created_at ON dynamic_sessions(created_at)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_dynamic_sessions_scan_id ON dynamic_sessions(scan_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_dynamic_sessions_risk_score ON dynamic_sessions(risk_score)")
     
     # Live Captures Table (Real-time Events)
     conn.execute("""
@@ -155,6 +191,10 @@ def save_scan(file_name, sha256, file_size, ml_result, vt_result=None, batch_id=
     conn.commit()
     scan_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
     conn.close()
+    
+    # Invalidate cache when new data is added
+    invalidate_stats_cache()
+    
     return scan_id
 
 
@@ -203,13 +243,38 @@ def get_batch(batch_id):
 
 
 def get_stats():
+    """Get statistics about scans - OPTIMIZED with caching and single query"""
+    global _stats_cache, _stats_cache_time
+    
+    # Return cached stats if still valid
+    if _stats_cache is not None and _stats_cache_time is not None:
+        if datetime.now() - _stats_cache_time < timedelta(seconds=STATS_CACHE_TTL):
+            return _stats_cache
+    
     conn = get_connection()
-    total = conn.execute("SELECT COUNT(*) FROM scans").fetchone()[0]
-    malicious = conn.execute("SELECT COUNT(*) FROM scans WHERE verdict = 'Malicious'").fetchone()[0]
-    benign = conn.execute("SELECT COUNT(*) FROM scans WHERE verdict = 'Benign'").fetchone()[0]
-    errors = conn.execute("SELECT COUNT(*) FROM scans WHERE verdict = 'Error'").fetchone()[0]
+    
+    # OPTIMIZED: Single query instead of 4 separate COUNT queries
+    query = """
+    SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN verdict = 'Malicious' THEN 1 ELSE 0 END) as malicious,
+        SUM(CASE WHEN verdict = 'Benign' THEN 1 ELSE 0 END) as benign,
+        SUM(CASE WHEN verdict = 'Error' THEN 1 ELSE 0 END) as errors
+    FROM scans
+    """
+    
+    result = conn.execute(query).fetchone()
     conn.close()
-    return {"total": total, "malicious": malicious, "benign": benign, "errors": errors}
+    
+    _stats_cache = {
+        "total": result['total'] or 0,
+        "malicious": result['malicious'] or 0,
+        "benign": result['benign'] or 0,
+        "errors": result['errors'] or 0
+    }
+    _stats_cache_time = datetime.now()
+    
+    return _stats_cache
 
 
 def clear_history():
@@ -217,6 +282,7 @@ def clear_history():
     conn.execute("DELETE FROM scans")
     conn.commit()
     conn.close()
+    invalidate_stats_cache()
 
 
 def delete_scan(scan_id):
@@ -224,6 +290,7 @@ def delete_scan(scan_id):
     conn.execute("DELETE FROM scans WHERE id = ?", (scan_id,))
     conn.commit()
     conn.close()
+    invalidate_stats_cache()
 
 
 # ============ Dynamic Analysis Functions ============
@@ -409,8 +476,8 @@ def save_monitor_event(monitor_session_id, event_type, file_path, file_hash, det
     conn.close()
 
 
-def get_monitor_events(limit=200, threat_level_filter=None, event_type_filter=None):
-    """Get realtime monitor events"""
+def get_monitor_events(limit=100, offset=0, threat_level_filter=None, event_type_filter=None, search=None):
+    """Get realtime monitor events with optional filters"""
     conn = get_connection()
     query = "SELECT * FROM monitor_events WHERE 1=1"
     params = []
@@ -423,8 +490,12 @@ def get_monitor_events(limit=200, threat_level_filter=None, event_type_filter=No
         query += " AND event_type = ?"
         params.append(event_type_filter)
     
-    query += " ORDER BY created_at DESC LIMIT ?"
-    params.append(limit)
+    if search:
+        query += " AND (process_name LIKE ? OR file_path LIKE ? OR details LIKE ?)"
+        params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
+    
+    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
     
     rows = conn.execute(query, params).fetchall()
     conn.close()
@@ -447,3 +518,11 @@ def get_monitor_stats():
         "medium": medium,
         "low": low
     }
+
+
+def clear_monitor_events():
+    """Clear all monitor events"""
+    conn = get_connection()
+    conn.execute("DELETE FROM monitor_events")
+    conn.commit()
+    conn.close()
